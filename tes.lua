@@ -242,8 +242,8 @@ UI.ScreenGui = ScreenGui
 
 -- Mobile detection
 State.IsMobile = DetectMobile()
-local WIN_W = State.IsMobile and 360 or 780
-local WIN_H = State.IsMobile and 550 or 500
+local WIN_W = State.IsMobile and 300 or 440
+local WIN_H = State.IsMobile and 380 or 320
 
 -- Floating reopen button
 local FloatingBtn = Instance.new("TextButton")
@@ -288,7 +288,7 @@ end
 -- Header
 local Header = Instance.new("Frame")
 Header.Name = "Header"
-Header.Size = UDim2.new(1, 0, 0, 44)
+Header.Size = UDim2.new(1, 0, 0, 36)
 Header.BackgroundColor3 = Color3.fromRGB(29, 31, 40)
 Header.BorderSizePixel = 0
 Header.Parent = MainWindow
@@ -303,7 +303,7 @@ HeaderTitle.Size = UDim2.new(1, -160, 1, 0)
 HeaderTitle.Position = UDim2.new(0, 12, 0, 0)
 HeaderTitle.BackgroundTransparency = 1
 HeaderTitle.Font = Enum.Font.GothamBold
-HeaderTitle.TextSize = 13
+HeaderTitle.TextSize = 11
 HeaderTitle.TextColor3 = Color3.fromRGB(245,245,250)
 HeaderTitle.TextXAlignment = Enum.TextXAlignment.Left
 HeaderTitle.Text = "● REMOTE MONITOR"
@@ -323,8 +323,8 @@ HeaderStatus.Parent = Header
 UI.StatusLabel = HeaderStatus
 
 local CloseBtn = Instance.new("TextButton")
-CloseBtn.Size = UDim2.new(0, 28, 0, 26)
-CloseBtn.Position = UDim2.new(1, -36, 0, 9)
+CloseBtn.Size = UDim2.new(0, 24, 0, 22)
+CloseBtn.Position = UDim2.new(1, -30, 0, 7)
 CloseBtn.BackgroundColor3 = Color3.fromRGB(215, 58, 68)
 CloseBtn.TextColor3 = Color3.fromRGB(255,255,255)
 CloseBtn.Font = Enum.Font.GothamBold
@@ -335,8 +335,8 @@ CloseBtn.Parent = Header
 do local c = Instance.new("UICorner"); c.CornerRadius = UDim.new(0,6); c.Parent = CloseBtn end
 
 local MinBtn = Instance.new("TextButton")
-MinBtn.Size = UDim2.new(0, 28, 0, 26)
-MinBtn.Position = UDim2.new(1, -70, 0, 9)
+MinBtn.Size = UDim2.new(0, 24, 0, 22)
+MinBtn.Position = UDim2.new(1, -58, 0, 7)
 MinBtn.BackgroundColor3 = Color3.fromRGB(47, 50, 62)
 MinBtn.TextColor3 = Color3.fromRGB(255,255,255)
 MinBtn.Font = Enum.Font.GothamBold
@@ -349,8 +349,8 @@ do local c = Instance.new("UICorner"); c.CornerRadius = UDim.new(0,6); c.Parent 
 -- Nav tabs
 local NavFrame = Instance.new("Frame")
 NavFrame.Name = "NavFrame"
-NavFrame.Size = UDim2.new(1, -20, 0, 32)
-NavFrame.Position = UDim2.new(0, 10, 0, 50)
+NavFrame.Size = UDim2.new(1, -20, 0, 26)
+NavFrame.Position = UDim2.new(0, 10, 0, 41)
 NavFrame.BackgroundTransparency = 1
 NavFrame.Parent = MainWindow
 
@@ -363,14 +363,14 @@ NavLayout.Parent = NavFrame
 -- Search
 local SearchBox = Instance.new("TextBox")
 SearchBox.Name = "SearchBox"
-SearchBox.Size = UDim2.new(1, -20, 0, 30)
-SearchBox.Position = UDim2.new(0, 10, 0, 88)
+SearchBox.Size = UDim2.new(1, -20, 0, 24)
+SearchBox.Position = UDim2.new(0, 10, 0, 72)
 SearchBox.BackgroundColor3 = Color3.fromRGB(26, 28, 36)
 SearchBox.TextColor3 = Color3.fromRGB(240,240,245)
 SearchBox.PlaceholderColor3 = Color3.fromRGB(120,125,140)
 SearchBox.PlaceholderText = "Search name, path, class, args..."
 SearchBox.Font = Enum.Font.Gotham
-SearchBox.TextSize = 11
+SearchBox.TextSize = 10
 SearchBox.ClearTextOnFocus = false
 SearchBox.TextXAlignment = Enum.TextXAlignment.Left
 SearchBox.Parent = MainWindow
@@ -384,8 +384,8 @@ end
 local listW = State.IsMobile and 1 or 0.62
 local ContentArea = Instance.new("Frame")
 ContentArea.Name = "ContentArea"
-ContentArea.Size = UDim2.new(listW, State.IsMobile and 0 or -14, 1, -130)
-ContentArea.Position = UDim2.new(0, 10, 0, 125)
+ContentArea.Size = UDim2.new(listW, State.IsMobile and 0 or -14, 1, -104)
+ContentArea.Position = UDim2.new(0, 10, 0, 100)
 ContentArea.BackgroundTransparency = 1
 ContentArea.Parent = MainWindow
 UI.ContentArea = ContentArea
@@ -395,8 +395,8 @@ local detailX = State.IsMobile and 0 or 0.62
 local detailW = State.IsMobile and 1 or 0.38
 local DetailPanel = Instance.new("Frame")
 DetailPanel.Name = "DetailPanel"
-DetailPanel.Size = UDim2.new(detailW, State.IsMobile and 0 or -4, 1, -130)
-DetailPanel.Position = UDim2.new(detailX, State.IsMobile and 0 or 4, 0, 125)
+DetailPanel.Size = UDim2.new(detailW, State.IsMobile and 0 or -4, 1, -104)
+DetailPanel.Position = UDim2.new(detailX, State.IsMobile and 0 or 4, 0, 100)
 DetailPanel.BackgroundColor3 = Color3.fromRGB(22, 24, 31)
 DetailPanel.BorderSizePixel = 0
 DetailPanel.Visible = not State.IsMobile
@@ -534,7 +534,7 @@ for _, tabName in ipairs(TabNames) do
     btn.BackgroundColor3 = isActive and Color3.fromRGB(49,53,69) or Color3.fromRGB(28,30,38)
     btn.TextColor3 = Color3.fromRGB(230,232,245)
     btn.Font = Enum.Font.GothamBold
-    btn.TextSize = 8
+    btn.TextSize = 7
     btn.Text = tabName
     btn.AutoButtonColor = false
     btn.Parent = NavFrame
@@ -608,7 +608,7 @@ local SettingsFrame = UI.TabFrames["SETTINGS"]
 
 local function MakeToggleRow(parent, label, initial, callback)
     local row = Instance.new("Frame")
-    row.Size = UDim2.new(1, -8, 0, 40)
+    row.Size = UDim2.new(1, -8, 0, 32)
     row.BackgroundColor3 = Color3.fromRGB(26,28,36)
     row.Parent = parent
     do local c = Instance.new("UICorner"); c.CornerRadius = UDim.new(0,6); c.Parent = row end
@@ -660,7 +660,7 @@ local ToggleDebug         = MakeToggleRow(SettingsFrame, "Debug Mode",          
 
 -- Max history row
 local MHRow = Instance.new("Frame")
-MHRow.Size = UDim2.new(1, -8, 0, 40)
+MHRow.Size = UDim2.new(1, -8, 0, 32)
 MHRow.BackgroundColor3 = Color3.fromRGB(26,28,36)
 MHRow.Parent = SettingsFrame
 do local c = Instance.new("UICorner"); c.CornerRadius = UDim.new(0,6); c.Parent = MHRow end
@@ -699,7 +699,7 @@ end)
 
 local function MakeSettingsBtn(label, color, fn)
     local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(1, -8, 0, 34)
+    btn.Size = UDim2.new(1, -8, 0, 28)
     btn.BackgroundColor3 = color
     btn.TextColor3 = Color3.fromRGB(255,255,255)
     btn.Font = Enum.Font.GothamBold
@@ -852,7 +852,7 @@ local function MakeCardForPath(path, parentFrame)
 
     local card = Instance.new("TextButton")
     card.Name = "Card_" .. path
-    card.Size = UDim2.new(1, -6, 0, 76)
+    card.Size = UDim2.new(1, -6, 0, 62)
     card.BackgroundColor3 = Color3.fromRGB(24, 26, 33)
     card.Text = ""
     card.AutoButtonColor = false
@@ -913,7 +913,7 @@ local function MakeCardForPath(path, parentFrame)
     local pathLabel = Instance.new("TextLabel")
     pathLabel.Name = "PathLabel"
     pathLabel.Size = UDim2.new(1, 0, 0, 16)
-    pathLabel.Position = UDim2.new(0, 0, 0, 17)
+    pathLabel.Position = UDim2.new(0, 0, 0, 14)
     pathLabel.BackgroundTransparency = 1
     pathLabel.Font = Enum.Font.GothamMedium
     pathLabel.TextSize = 10
@@ -927,7 +927,7 @@ local function MakeCardForPath(path, parentFrame)
     local statusLabel = Instance.new("TextLabel")
     statusLabel.Name = "StatusLabel"
     statusLabel.Size = UDim2.new(0.3, 0, 0, 14)
-    statusLabel.Position = UDim2.new(0, 0, 0, 36)
+    statusLabel.Position = UDim2.new(0, 0, 0, 30)
     statusLabel.BackgroundColor3 = GetStatusBadgeColor(reg.Status)
     statusLabel.BackgroundTransparency = 0.4
     statusLabel.Font = Enum.Font.GothamBold
@@ -942,7 +942,7 @@ local function MakeCardForPath(path, parentFrame)
     local argsLabel = Instance.new("TextLabel")
     argsLabel.Name = "ArgsLabel"
     argsLabel.Size = UDim2.new(1, 0, 0, 20)
-    argsLabel.Position = UDim2.new(0, 0, 0, 54)
+    argsLabel.Position = UDim2.new(0, 0, 0, 46)
     argsLabel.BackgroundTransparency = 1
     argsLabel.Font = Enum.Font.Gotham
     argsLabel.TextSize = 9
@@ -1096,7 +1096,7 @@ local function AddHistoryCard(histEntry)
 
     local card = Instance.new("TextButton")
     card.Name = "HistCard"
-    card.Size = UDim2.new(1, -6, 0, 60)
+    card.Size = UDim2.new(1, -6, 0, 50)
     card.BackgroundColor3 = Color3.fromRGB(22, 24, 31)
     card.Text = ""
     card.AutoButtonColor = false
@@ -1133,7 +1133,7 @@ local function AddHistoryCard(histEntry)
 
     local nameL = Instance.new("TextLabel")
     nameL.Size = UDim2.new(1, 0, 0, 14)
-    nameL.Position = UDim2.new(0, 0, 0, 17)
+    nameL.Position = UDim2.new(0, 0, 0, 14)
     nameL.BackgroundTransparency = 1
     nameL.Font = Enum.Font.GothamMedium
     nameL.TextSize = 10
@@ -1145,7 +1145,7 @@ local function AddHistoryCard(histEntry)
 
     local argsL = Instance.new("TextLabel")
     argsL.Size = UDim2.new(1, 0, 0, 14)
-    argsL.Position = UDim2.new(0, 0, 0, 34)
+    argsL.Position = UDim2.new(0, 0, 0, 28)
     argsL.BackgroundTransparency = 1
     argsL.Font = Enum.Font.Gotham
     argsL.TextSize = 9
@@ -1683,7 +1683,7 @@ FloatingBtn.MouseButton1Click:Connect(AnimateWindowOpen)
 
 MinBtn.MouseButton1Click:Connect(function()
     State.IsMinimized = not State.IsMinimized
-    local targetH = State.IsMinimized and 44 or OriginalSize.Y.Offset
+    local targetH = State.IsMinimized and 36 or OriginalSize.Y.Offset
     TweenService:Create(MainWindow, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
         Size = UDim2.new(0, OriginalSize.X.Offset, 0, targetH)
     }):Play()
