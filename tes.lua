@@ -3,31 +3,20 @@ local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 local TextService = game:GetService("TextService")
-local Workspace = game:GetService("Workspace")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Players = game:GetService("Players")
 
-local Camera = Workspace.CurrentCamera
-
-local Connections = {}
-local HistoryData = {}
-local RemoteStats = {}
-local ActiveTab = "ALL"
-local CurrentDetail = nil
-local CurrentSelectedCard = nil
-local SearchQuery = ""
-local IsMobileLayout = false
-
-local SettingsState = {
-    AutoScroll = true,
-    ShowTimestamp = true,
-    ShowFullPath = true,
-    MaxHistory = 500
-}
-
-local UIReferences = {
-    Cards = {},
-    TabButtons = {},
-    TabFrames = {},
-    CardsByTab = {
+local State = {
+    ActiveTab = "ALL",
+    SelectedEntry = nil,
+    SearchQuery = "",
+    IsMinimized = false,
+    IsClosed = false,
+    CallCounters = {},
+    MonitoredRemotes = {},
+    Connections = {},
+    History = {},
+    TabEntries = {
         ["ALL"] = {},
         ["REMOTE EVENT"] = {},
         ["REMOTE FUNCTION"] = {},
@@ -35,1125 +24,2087 @@ local UIReferences = {
     }
 }
 
+local Settings = {
+    AutoScroll = true,
+    ShowTimestamp = true,
+    ShowFullPath = true,
+    MaxHistory = 500
+}
+
+local DefaultSettings = {
+    AutoScroll = true,
+    ShowTimestamp = true,
+    ShowFullPath = true,
+    MaxHistory = 500
+}
+
+local UI = {
+    ScreenGui = nil,
+    MainWindow = nil,
+    FloatingBtn = nil,
+    Header = nil,
+    SearchBox = nil,
+    DetailPanel = nil,
+    DetailText = nil,
+    DetailScroll = nil,
+    TabButtons = {},
+    TabFrames = {}
+}
+
+local ExecutorAPIs = {
+    HasGetConnections = typeof(getconnections) == "function",
+    HasNamecallHook = typeof(hookmetamethod) == "function",
+    HasNamecallMethod = typeof(getnamecallmethod) == "function",
+    HasClipboard = typeof(setclipboard) == "function" or typeof(toclipboard) == "function"
+}
+
+local HookState = {
+    Installed = false,
+    OldNamecall = nil,
+    WrappedInvoke = {}
+}
+
 local function SafeSetClipboard(text)
-    if not text then return false end
-    local success = false
-    pcall(function()
-        if typeof(setclipboard) == "function" then
-            setclipboard(tostring(text))
-            success = true
-        elseif typeof(toclipboard) == "function" then
-            toclipboard(tostring(text))
-            success = true
-        elseif typeof(set_clipboard) == "function" then
-            set_clipboard(tostring(text))
-            success = true
-        elseif Clipboard and typeof(Clipboard.set) == "function" then
-            Clipboard.set(tostring(text))
-            success = true
-        end
-    end)
-    return success
+    if typeof(setclipboard) == "function" then
+        local ok = pcall(setclipboard, text)
+        return ok
+    end
+
+    if typeof(toclipboard) == "function" then
+        local ok = pcall(toclipboard, text)
+        return ok
+    end
+
+    return false
 end
 
-local function GetCurrentTimestamp()
+local function GetTimestamp()
     local date = os.date("*t")
-    return string.format("%02d:%02d:%02d", date.hour, date.min, date.sec)
+    return string.format(
+        "%02d:%02d:%02d",
+        date.hour,
+        date.min,
+        date.sec
+    )
 end
 
-local function GetInstanceFullPath(instance)
+local function GetFullPath(instance)
     if not instance or typeof(instance) ~= "Instance" then
         return "Unknown"
     end
-    local success, result = pcall(function()
+
+    local ok, result = pcall(function()
         return instance:GetFullName()
     end)
-    return success and result or tostring(instance)
+
+    if ok then
+        return result
+    end
+
+    return tostring(instance)
+end
+
+local function TrackConnection(connection)
+    if connection and typeof(connection) == "RBXScriptConnection" then
+        table.insert(State.Connections, connection)
+    end
+
+    return connection
 end
 
 local FormatValue
+
 local function FormatTableRecursive(tbl, indent, depth, visited)
+    indent = indent or ""
+    depth = depth or 1
+    visited = visited or {}
+
     if depth > 5 then
-        return indent .. "[Depth Limit Reached]"
+        return indent .. "[MAX DEPTH]"
     end
+
     if visited[tbl] then
-        return indent .. "[Circular Reference]"
+        return indent .. "[CIRCULAR REFERENCE]"
     end
+
     visited[tbl] = true
 
-    local lines = {}
     local keys = {}
-    for k in pairs(tbl) do
-        table.insert(keys, k)
+
+    for key in pairs(tbl) do
+        table.insert(keys, key)
     end
+
     table.sort(keys, function(a, b)
         return tostring(a) < tostring(b)
     end)
 
-    local total = #keys
-    for i, k in ipairs(keys) do
-        local v = tbl[k]
-        local isLast = (i == total)
-        local branch = isLast and "└── " or "├── "
-        local nextIndent = indent .. (isLast and "    " or "│   ")
-        local keyStr = tostring(k)
-        if type(k) == "number" then
-            keyStr = "[" .. keyStr .. "]"
+    local lines = {}
+
+    for index, key in ipairs(keys) do
+        local value = tbl[key]
+        local last = index == #keys
+
+        local branch = last and "└── " or "├── "
+        local nextIndent = indent .. (last and "    " or "│   ")
+
+        local keyText = tostring(key)
+
+        if type(key) == "number" then
+            keyText = "[" .. keyText .. "]"
         end
 
-        if type(v) == "table" then
-            table.insert(lines, indent .. branch .. keyStr)
-            table.insert(lines, FormatTableRecursive(v, nextIndent, depth + 1, visited))
+        if type(value) == "table" then
+            table.insert(
+                lines,
+                indent .. branch .. keyText
+            )
+
+            table.insert(
+                lines,
+                FormatTableRecursive(
+                    value,
+                    nextIndent,
+                    depth + 1,
+                    visited
+                )
+            )
         else
-            table.insert(lines, indent .. branch .. keyStr .. " = " .. FormatValue(v, nextIndent, depth + 1, visited, true))
+            table.insert(
+                lines,
+                indent
+                    .. branch
+                    .. keyText
+                    .. " = "
+                    .. FormatValue(
+                        value,
+                        nextIndent,
+                        depth + 1,
+                        visited,
+                        true
+                    )
+            )
         end
     end
+
     visited[tbl] = nil
-return table.concat(lines, "\n")
+
+    if #lines == 0 then
+        return indent .. "{}"
+    end
+
+    return table.concat(lines, "\n")
 end
 
-FormatValue = function(val, indent, depth, visited, skipTableRoot)
+FormatValue = function(value, indent, depth, visited)
     indent = indent or ""
     depth = depth or 1
     visited = visited or {}
-    local vType = typeof(val)
 
-    if vType == "string" then
-        return string.format("%q", val)
-    elseif vType == "number" or vType == "boolean" or vType == "nil" then
-        return tostring(val)
-    elseif vType == "Instance" then
-        return GetInstanceFullPath(val)
-    elseif vType == "Vector2" then
-        return string.format("Vector2.new(%.2f, %.2f)", val.X, val.Y)
-    elseif vType == "Vector3" then
-        return string.format("Vector3.new(%.2f, %.2f, %.2f)", val.X, val.Y, val.Z)
-    elseif vType == "CFrame" then
-        local x, y, z = val.Position.X, val.Position.Y, val.Position.Z
-        return string.format("CFrame.new(%.2f, %.2f, %.2f)", x, y, z)
-    elseif vType == "Color3" then
-        return string.format("Color3.fromRGB(%d, %d, %d)", math.floor(val.R * 255), math.floor(val.G * 255), math.floor(val.B * 255))
-    elseif vType == "BrickColor" then
-        return string.format("BrickColor.new(%q)", val.Name)
-    elseif vType == "EnumItem" then
-        return tostring(val)
-    elseif vType == "UDim2" then
-        return string.format("UDim2.new(%.2f, %d, %.2f, %d)", val.X.Scale, val.X.Offset, val.Y.Scale, val.Y.Offset)
-    elseif vType == "Ray" then
-        return string.format("Ray.new(%s, %s)", tostring(val.Origin), tostring(val.Direction))
-    elseif vType == "table" then
-        return "Table\n" .. FormatTableRecursive(val, indent, depth, visited)
-    else
-        return string.format("[%s: %s]", vType, tostring(val))
+    local valueType = typeof(value)
+
+    if valueType == "string" then
+        return string.format("%q", value)
     end
+
+    if valueType == "number" then
+        return tostring(value)
+    end
+
+    if valueType == "boolean" then
+        return tostring(value)
+    end
+
+    if valueType == "nil" then
+        return "nil"
+    end
+
+    if valueType == "Instance" then
+        return GetFullPath(value)
+    end
+
+    if valueType == "Vector2" then
+        return string.format(
+            "Vector2.new(%.3f, %.3f)",
+            value.X,
+            value.Y
+        )
+    end
+
+    if valueType == "Vector3" then
+        return string.format(
+            "Vector3.new(%.3f, %.3f, %.3f)",
+            value.X,
+            value.Y,
+            value.Z
+        )
+    end
+
+    if valueType == "CFrame" then
+        local position = value.Position
+
+        return string.format(
+            "CFrame.new(%.3f, %.3f, %.3f)",
+            position.X,
+            position.Y,
+            position.Z
+        )
+    end
+
+    if valueType == "Color3" then
+        return string.format(
+            "Color3.fromRGB(%d, %d, %d)",
+            math.floor(value.R * 255 + 0.5),
+            math.floor(value.G * 255 + 0.5),
+            math.floor(value.B * 255 + 0.5)
+        )
+    end
+
+    if valueType == "BrickColor" then
+        return string.format(
+            "BrickColor.new(%q)",
+            value.Name
+        )
+    end
+
+    if valueType == "EnumItem" then
+        return tostring(value)
+    end
+
+    if valueType == "UDim2" then
+        return string.format(
+            "UDim2.new(%.3f, %d, %.3f, %d)",
+            value.X.Scale,
+            value.X.Offset,
+            value.Y.Scale,
+            value.Y.Offset
+        )
+    end
+
+    if valueType == "Ray" then
+        return "Ray.new("
+            .. tostring(value.Origin)
+            .. ", "
+            .. tostring(value.Direction)
+            .. ")"
+    end
+
+    if valueType == "table" then
+        return "Table\n"
+            .. FormatTableRecursive(
+                value,
+                indent,
+                depth,
+                visited
+            )
+    end
+
+    return "[" .. valueType .. "] " .. tostring(value)
 end
 
-local function FormatArgumentsList(args)
+local function FormatArgsList(args)
     if not args or #args == 0 then
         return "None"
     end
-    local lines = {}
-    for i, arg in ipairs(args) do
-        local t = typeof(arg)
-        local formatted = FormatValue(arg)
-        table.insert(lines, string.format("[%d] (%s):\n%s", i, t, formatted))
-    end
-    return table.concat(lines, "\n\n")
-end
 
-local function GetCurrentViewport()
-    local vp = Camera and Camera.ViewportSize or Vector2.new(800, 600)
-    if vp.X < 50 or vp.Y < 50 then
-        return Vector2.new(800, 600)
-    end
-    return vp
-end
+    local result = {}
 
-local function CalculateWindowSize(vp)
-    local w = math.clamp(vp.X - 16, 280, 560)
-    local h = math.clamp(vp.Y - 24, 220, 320)
-    return Vector2.new(w, h)
+    for index, value in ipairs(args) do
+        table.insert(
+            result,
+            string.format(
+                "[%d] %s\n%s",
+                index,
+                typeof(value),
+                FormatValue(value)
+            )
+        )
+    end
+
+    return table.concat(result, "\n\n")
 end
 
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "RemoteEventMonitor"
 ScreenGui.ResetOnSpawn = false
-ScreenGui.DisplayOrder = 999
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 ScreenGui.Parent = CoreGui
 
-local FloatingButton = Instance.new("TextButton")
-FloatingButton.Name = "FloatingOpenButton"
-FloatingButton.Size = UDim2.new(0, 95, 0, 32)
-FloatingButton.Position = UDim2.new(0, 15, 0.5, -16)
-FloatingButton.BackgroundColor3 = Color3.fromRGB(28, 28, 36)
-FloatingButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-FloatingButton.Font = Enum.Font.GothamBold
-FloatingButton.TextSize = 11
-FloatingButton.Text = "[ REMOTE ]"
-FloatingButton.Visible = false
-FloatingButton.ZIndex = 100
-FloatingButton.Active = true
-FloatingButton.Parent = ScreenGui
+UI.ScreenGui = ScreenGui
 
-local FloatingCorner = Instance.new("UICorner")
-FloatingCorner.CornerRadius = UDim.new(0, 8)
-FloatingCorner.Parent = FloatingButton
+local FloatingBtn = Instance.new("TextButton")
+FloatingBtn.Name = "FloatingReopenBtn"
+FloatingBtn.Size = UDim2.new(0, 125, 0, 40)
+FloatingBtn.Position = UDim2.new(0, 16, 0.5, -20)
+FloatingBtn.BackgroundColor3 = Color3.fromRGB(25, 27, 34)
+FloatingBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+FloatingBtn.Font = Enum.Font.GothamBold
+FloatingBtn.TextSize = 12
+FloatingBtn.Text = "[ REMOTE MONITOR ]"
+FloatingBtn.Visible = false
+FloatingBtn.ZIndex = 100
+FloatingBtn.Parent = ScreenGui
 
-local FloatingStroke = Instance.new("UIStroke")
-FloatingStroke.Color = Color3.fromRGB(60, 60, 80)
-FloatingStroke.Thickness = 1
-FloatingStroke.Parent = FloatingButton
+UI.FloatingBtn = FloatingBtn
 
-local initVp = GetCurrentViewport()
-local initSize = CalculateWindowSize(initVp)
+local FloatCorner = Instance.new("UICorner")
+FloatCorner.CornerRadius = UDim.new(0, 8)
+FloatCorner.Parent = FloatingBtn
+
+local FloatStroke = Instance.new("UIStroke")
+FloatStroke.Color = Color3.fromRGB(70, 75, 95)
+FloatStroke.Thickness = 1
+FloatStroke.Transparency = 0.3
+FloatStroke.Parent = FloatingBtn
+
+local FloatGrad = Instance.new("UIGradient")
+FloatGrad.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(
+        0,
+        Color3.fromRGB(40, 43, 54)
+    ),
+    ColorSequenceKeypoint.new(
+        1,
+        Color3.fromRGB(20, 22, 28)
+    )
+})
+FloatGrad.Rotation = 45
+FloatGrad.Parent = FloatingBtn
 
 local MainWindow = Instance.new("Frame")
 MainWindow.Name = "MainWindow"
-MainWindow.Size = UDim2.new(0, initSize.X, 0, initSize.Y)
-MainWindow.Position = UDim2.new(0.5, -initSize.X / 2, 0.5, -initSize.Y / 2)
-MainWindow.BackgroundColor3 = Color3.fromRGB(18, 18, 22)
+MainWindow.Size = UDim2.new(0, 780, 0, 500)
+MainWindow.Position = UDim2.new(0.5, -390, 0.5, -250)
+MainWindow.BackgroundColor3 = Color3.fromRGB(18, 19, 24)
 MainWindow.BorderSizePixel = 0
 MainWindow.ClipsDescendants = true
-MainWindow.Active = true
 MainWindow.Parent = ScreenGui
 
+UI.MainWindow = MainWindow
+
 local MainCorner = Instance.new("UICorner")
-MainCorner.CornerRadius = UDim.new(0, 8)
+MainCorner.CornerRadius = UDim.new(0, 11)
 MainCorner.Parent = MainWindow
 
 local MainStroke = Instance.new("UIStroke")
-MainStroke.Color = Color3.fromRGB(45, 45, 55)
+MainStroke.Color = Color3.fromRGB(65, 69, 85)
 MainStroke.Thickness = 1
+MainStroke.Transparency = 0.35
 MainStroke.Parent = MainWindow
+
+local MainGrad = Instance.new("UIGradient")
+MainGrad.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(
+        0,
+        Color3.fromRGB(25, 27, 34)
+    ),
+    ColorSequenceKeypoint.new(
+        1,
+        Color3.fromRGB(15, 16, 20)
+    )
+})
+MainGrad.Rotation = 90
+MainGrad.Parent = MainWindow
 
 local Header = Instance.new("Frame")
 Header.Name = "Header"
-Header.Size = UDim2.new(1, 0, 0, 34)
-Header.BackgroundColor3 = Color3.fromRGB(24, 24, 30)
+Header.Size = UDim2.new(1, 0, 0, 44)
+Header.BackgroundColor3 = Color3.fromRGB(29, 31, 40)
 Header.BorderSizePixel = 0
-Header.Active = true
 Header.Parent = MainWindow
 
+UI.Header = Header
+
 local HeaderCorner = Instance.new("UICorner")
-HeaderCorner.CornerRadius = UDim.new(0, 8)
+HeaderCorner.CornerRadius = UDim.new(0, 11)
 HeaderCorner.Parent = Header
 
-local DragArea = Instance.new("Frame")
-DragArea.Name = "DragArea"
-DragArea.Size = UDim2.new(1, -64, 1, 0)
-DragArea.Position = UDim2.new(0, 0, 0, 0)
-DragArea.BackgroundTransparency = 1
-DragArea.Active = true
-DragArea.Parent = Header
+local HeaderTitle = Instance.new("TextLabel")
+HeaderTitle.Size = UDim2.new(1, -145, 1, 0)
+HeaderTitle.Position = UDim2.new(0, 15, 0, 0)
+HeaderTitle.BackgroundTransparency = 1
+HeaderTitle.Font = Enum.Font.GothamBold
+HeaderTitle.TextSize = 14
+HeaderTitle.TextColor3 = Color3.fromRGB(245, 245, 250)
+HeaderTitle.TextXAlignment = Enum.TextXAlignment.Left
+HeaderTitle.Text = "REMOTE EVENT MONITOR"
+HeaderTitle.Parent = Header
 
-local Title = Instance.new("TextLabel")
-Title.Name = "Title"
-Title.Size = UDim2.new(1, -10, 1, 0)
-Title.Position = UDim2.new(0, 10, 0, 0)
-Title.BackgroundTransparency = 1
-Title.Font = Enum.Font.GothamBold
-Title.TextSize = 12
-Title.TextColor3 = Color3.fromRGB(240, 240, 240)
-Title.TextXAlignment = Enum.TextXAlignment.Left
-Title.Text = "REMOTE MONITOR"
-Title.Parent = DragArea
-
-local MinBtn = Instance.new("TextButton")
-MinBtn.Name = "MinButton"
-MinBtn.Size = UDim2.new(0, 24, 0, 24)
-MinBtn.Position = UDim2.new(1, -56, 0, 5)
-MinBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
-MinBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-MinBtn.Font = Enum.Font.GothamBold
-MinBtn.TextSize = 12
-MinBtn.Text = "-"
-MinBtn.ZIndex = 5
-MinBtn.Parent = Header
-
-local MinCorner = Instance.new("UICorner")
-MinCorner.CornerRadius = UDim.new(0, 4)
-MinCorner.Parent = MinBtn
+local HeaderStatus = Instance.new("TextLabel")
+HeaderStatus.Size = UDim2.new(0, 95, 1, 0)
+HeaderStatus.Position = UDim2.new(1, -175, 0, 0)
+HeaderStatus.BackgroundTransparency = 1
+HeaderStatus.Font = Enum.Font.GothamMedium
+HeaderStatus.TextSize = 9
+HeaderStatus.TextColor3 = Color3.fromRGB(110, 220, 145)
+HeaderStatus.TextXAlignment = Enum.TextXAlignment.Right
+HeaderStatus.Text = "● MONITORING"
+HeaderStatus.Parent = Header
 
 local CloseBtn = Instance.new("TextButton")
-CloseBtn.Name = "CloseButton"
-CloseBtn.Size = UDim2.new(0, 24, 0, 24)
-CloseBtn.Position = UDim2.new(1, -28, 0, 5)
-CloseBtn.BackgroundColor3 = Color3.fromRGB(220, 60, 60)
+CloseBtn.Name = "CloseBtn"
+CloseBtn.Size = UDim2.new(0, 30, 0, 28)
+CloseBtn.Position = UDim2.new(1, -38, 0, 8)
+CloseBtn.BackgroundColor3 = Color3.fromRGB(220, 60, 70)
 CloseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 CloseBtn.Font = Enum.Font.GothamBold
-CloseBtn.TextSize = 12
-CloseBtn.Text = "X"
-CloseBtn.ZIndex = 5
+CloseBtn.TextSize = 13
+CloseBtn.Text = "×"
 CloseBtn.Parent = Header
 
 local CloseCorner = Instance.new("UICorner")
-CloseCorner.CornerRadius = UDim.new(0, 4)
+CloseCorner.CornerRadius = UDim.new(0, 6)
 CloseCorner.Parent = CloseBtn
 
-local NavScroll = Instance.new("ScrollingFrame")
-NavScroll.Name = "NavScroll"
-NavScroll.Size = UDim2.new(1, -12, 0, 28)
-NavScroll.Position = UDim2.new(0, 6, 0, 38)
-NavScroll.BackgroundTransparency = 1
-NavScroll.ScrollBarThickness = 0
-NavScroll.ScrollingDirection = Enum.ScrollingDirection.Horizontal
-NavScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
-NavScroll.Parent = MainWindow
+local MinBtn = Instance.new("TextButton")
+MinBtn.Name = "MinBtn"
+MinBtn.Size = UDim2.new(0, 30, 0, 28)
+MinBtn.Position = UDim2.new(1, -74, 0, 8)
+MinBtn.BackgroundColor3 = Color3.fromRGB(47, 50, 62)
+MinBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+MinBtn.Font = Enum.Font.GothamBold
+MinBtn.TextSize = 15
+MinBtn.Text = "−"
+MinBtn.Parent = Header
+
+local MinCorner = Instance.new("UICorner")
+MinCorner.CornerRadius = UDim.new(0, 6)
+MinCorner.Parent = MinBtn
+
+local NavFrame = Instance.new("Frame")
+NavFrame.Name = "NavFrame"
+NavFrame.Size = UDim2.new(1, -20, 0, 34)
+NavFrame.Position = UDim2.new(0, 10, 0, 52)
+NavFrame.BackgroundTransparency = 1
+NavFrame.Parent = MainWindow
 
 local NavLayout = Instance.new("UIListLayout")
 NavLayout.FillDirection = Enum.FillDirection.Horizontal
 NavLayout.HorizontalAlignment = Enum.HorizontalAlignment.Left
-NavLayout.Padding = UDim.new(0, 4)
-NavLayout.Parent = NavScroll
-
-NavLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-    NavScroll.CanvasSize = UDim2.new(0, NavLayout.AbsoluteContentSize.X + 8, 0, 0)
-end)
+NavLayout.Padding = UDim.new(0, 5)
+NavLayout.Parent = NavFrame
 
 local SearchBox = Instance.new("TextBox")
 SearchBox.Name = "SearchBox"
-SearchBox.Size = UDim2.new(1, -12, 0, 26)
-SearchBox.Position = UDim2.new(0, 6, 0, 70)
-SearchBox.BackgroundColor3 = Color3.fromRGB(24, 24, 30)
-SearchBox.TextColor3 = Color3.fromRGB(240, 240, 240)
-SearchBox.PlaceholderColor3 = Color3.fromRGB(110, 110, 120)
-SearchBox.PlaceholderText = "Search by Name, Path, or Arguments..."
+SearchBox.Size = UDim2.new(1, -20, 0, 34)
+SearchBox.Position = UDim2.new(0, 10, 0, 92)
+SearchBox.BackgroundColor3 = Color3.fromRGB(26, 28, 36)
+SearchBox.TextColor3 = Color3.fromRGB(240, 240, 245)
+SearchBox.PlaceholderColor3 = Color3.fromRGB(125, 130, 145)
+SearchBox.PlaceholderText = "Search remote, path, class, arguments..."
 SearchBox.Font = Enum.Font.Gotham
 SearchBox.TextSize = 11
 SearchBox.ClearTextOnFocus = false
+SearchBox.TextXAlignment = Enum.TextXAlignment.Left
 SearchBox.Parent = MainWindow
 
+UI.SearchBox = SearchBox
+
 local SearchCorner = Instance.new("UICorner")
-SearchCorner.CornerRadius = UDim.new(0, 5)
+SearchCorner.CornerRadius = UDim.new(0, 7)
 SearchCorner.Parent = SearchBox
 
 local SearchPadding = Instance.new("UIPadding")
-SearchPadding.PaddingLeft = UDim.new(0, 8)
-SearchPadding.PaddingRight = UDim.new(0, 8)
+SearchPadding.PaddingLeft = UDim.new(0, 11)
+SearchPadding.PaddingRight = UDim.new(0, 11)
 SearchPadding.Parent = SearchBox
 
-local ContentContainer = Instance.new("Frame")
-ContentContainer.Name = "ContentContainer"
-ContentContainer.Size = UDim2.new(1, -195, 1, -104)
-ContentContainer.Position = UDim2.new(0, 6, 0, 100)
-ContentContainer.BackgroundTransparency = 1
-ContentContainer.ClipsDescendants = true
-ContentContainer.Parent = MainWindow
+local ContentArea = Instance.new("Frame")
+ContentArea.Name = "ContentArea"
+ContentArea.Size = UDim2.new(1, -290, 1, -144)
+ContentArea.Position = UDim2.new(0, 10, 0, 134)
+ContentArea.BackgroundTransparency = 1
+ContentArea.Parent = MainWindow
 
 local DetailPanel = Instance.new("Frame")
 DetailPanel.Name = "DetailPanel"
-DetailPanel.Size = UDim2.new(0, 180, 1, -104)
-DetailPanel.Position = UDim2.new(1, -186, 0, 100)
-DetailPanel.BackgroundColor3 = Color3.fromRGB(22, 22, 28)
+DetailPanel.Size = UDim2.new(0, 270, 1, -144)
+DetailPanel.Position = UDim2.new(1, -280, 0, 134)
+DetailPanel.BackgroundColor3 = Color3.fromRGB(23, 25, 32)
 DetailPanel.BorderSizePixel = 0
-DetailPanel.ZIndex = 10
 DetailPanel.Parent = MainWindow
 
+UI.DetailPanel = DetailPanel
+
 local DetailCorner = Instance.new("UICorner")
-DetailCorner.CornerRadius = UDim.new(0, 6)
+DetailCorner.CornerRadius = UDim.new(0, 8)
 DetailCorner.Parent = DetailPanel
 
-local DetailHeader = Instance.new("Frame")
-DetailHeader.Name = "DetailHeader"
-DetailHeader.Size = UDim2.new(1, 0, 0, 24)
+local DetailHeader = Instance.new("TextLabel")
+DetailHeader.Size = UDim2.new(1, -20, 0, 28)
+DetailHeader.Position = UDim2.new(0, 10, 0, 7)
 DetailHeader.BackgroundTransparency = 1
+DetailHeader.Font = Enum.Font.GothamBold
+DetailHeader.TextSize = 12
+DetailHeader.TextColor3 = Color3.fromRGB(250, 250, 255)
+DetailHeader.TextXAlignment = Enum.TextXAlignment.Left
+DetailHeader.Text = "REMOTE DETAILS"
 DetailHeader.Parent = DetailPanel
 
-local DetailBackBtn = Instance.new("TextButton")
-DetailBackBtn.Name = "DetailBackBtn"
-DetailBackBtn.Size = UDim2.new(0, 36, 0, 20)
-DetailBackBtn.Position = UDim2.new(0, 4, 0, 2)
-DetailBackBtn.BackgroundColor3 = Color3.fromRGB(38, 38, 48)
-DetailBackBtn.TextColor3 = Color3.fromRGB(240, 240, 240)
-DetailBackBtn.Font = Enum.Font.GothamBold
-DetailBackBtn.TextSize = 9
-DetailBackBtn.Text = "< BACK"
-DetailBackBtn.Visible = false
-DetailBackBtn.ZIndex = 11
-DetailBackBtn.Parent = DetailHeader
-
-local DetailBackCorner = Instance.new("UICorner")
-DetailBackCorner.CornerRadius = UDim.new(0, 4)
-DetailBackCorner.Parent = DetailBackBtn
-
-local DetailTitle = Instance.new("TextLabel")
-DetailTitle.Name = "DetailTitle"
-DetailTitle.Size = UDim2.new(1, -10, 1, 0)
-DetailTitle.Position = UDim2.new(0, 5, 0, 0)
-DetailTitle.BackgroundTransparency = 1
-DetailTitle.Font = Enum.Font.GothamBold
-DetailTitle.TextSize = 10
-DetailTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
-DetailTitle.TextXAlignment = Enum.TextXAlignment.Left
-DetailTitle.TextTruncate = Enum.TextTruncate.AtEnd
-DetailTitle.Text = "DETAILS"
-DetailTitle.ZIndex = 11
-DetailTitle.Parent = DetailHeader
+local DetailSubHeader = Instance.new("TextLabel")
+DetailSubHeader.Size = UDim2.new(1, -20, 0, 18)
+DetailSubHeader.Position = UDim2.new(0, 10, 0, 30)
+DetailSubHeader.BackgroundTransparency = 1
+DetailSubHeader.Font = Enum.Font.Gotham
+DetailSubHeader.TextSize = 9
+DetailSubHeader.TextColor3 = Color3.fromRGB(120, 125, 140)
+DetailSubHeader.TextXAlignment = Enum.TextXAlignment.Left
+DetailSubHeader.Text = "Select a remote"
+DetailSubHeader.Parent = DetailPanel
 
 local DetailScroll = Instance.new("ScrollingFrame")
 DetailScroll.Name = "DetailScroll"
-DetailScroll.Size = UDim2.new(1, -10, 1, -54)
-DetailScroll.Position = UDim2.new(0, 5, 0, 24)
+DetailScroll.Size = UDim2.new(1, -18, 1, -92)
+DetailScroll.Position = UDim2.new(0, 9, 0, 51)
 DetailScroll.BackgroundTransparency = 1
-DetailScroll.ScrollBarThickness = 3
+DetailScroll.BorderSizePixel = 0
+DetailScroll.ScrollBarThickness = 4
+DetailScroll.ScrollBarImageColor3 = Color3.fromRGB(70, 74, 90)
 DetailScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
-DetailScroll.ZIndex = 11
 DetailScroll.Parent = DetailPanel
 
-local DetailContentText = Instance.new("TextLabel")
-DetailContentText.Name = "DetailContentText"
-DetailContentText.Size = UDim2.new(1, -4, 0, 0)
-DetailContentText.Position = UDim2.new(0, 0, 0, 0)
-DetailContentText.BackgroundTransparency = 1
-DetailContentText.Font = Enum.Font.Gotham
-DetailContentText.TextSize = 10
-DetailContentText.TextColor3 = Color3.fromRGB(190, 190, 200)
-DetailContentText.TextXAlignment = Enum.TextXAlignment.Left
-DetailContentText.TextYAlignment = Enum.TextYAlignment.Top
-DetailContentText.TextWrapped = true
-DetailContentText.Text = "Select an event card to inspect details."
-DetailContentText.ZIndex = 11
-DetailContentText.Parent = DetailScroll
+UI.DetailScroll = DetailScroll
 
-local DetailActionFrame = Instance.new("Frame")
-DetailActionFrame.Name = "DetailActionFrame"
-DetailActionFrame.Size = UDim2.new(1, -8, 0, 24)
-DetailActionFrame.Position = UDim2.new(0, 4, 1, -27)
-DetailActionFrame.BackgroundTransparency = 1
-DetailActionFrame.ZIndex = 11
-DetailActionFrame.Parent = DetailPanel
+local DetailText = Instance.new("TextLabel")
+DetailText.Name = "DetailContent"
+DetailText.Size = UDim2.new(1, -8, 0, 0)
+DetailText.Position = UDim2.new(0, 4, 0, 0)
+DetailText.BackgroundTransparency = 1
+DetailText.Font = Enum.Font.Gotham
+DetailText.TextSize = 10
+DetailText.TextColor3 = Color3.fromRGB(210, 215, 225)
+DetailText.TextXAlignment = Enum.TextXAlignment.Left
+DetailText.TextYAlignment = Enum.TextYAlignment.Top
+DetailText.TextWrapped = true
+DetailText.Text = "Select an event from the list to view its complete details."
+DetailText.Parent = DetailScroll
 
-local CopyActionLayout = Instance.new("UIListLayout")
-CopyActionLayout.FillDirection = Enum.FillDirection.Horizontal
-CopyActionLayout.Padding = UDim.new(0, 3)
-CopyActionLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-CopyActionLayout.Parent = DetailActionFrame
+UI.DetailText = DetailText
 
-local function CreateDetailActionButton(name, labelText)
-    local btn = Instance.new("TextButton")
-    btn.Name = name
-    btn.Size = UDim2.new(0, 54, 1, 0)
-    btn.BackgroundColor3 = Color3.fromRGB(34, 34, 42)
-    btn.TextColor3 = Color3.fromRGB(240, 240, 240)
-    btn.Font = Enum.Font.GothamBold
-    btn.TextSize = 8
-    btn.Text = labelText
-    btn.ZIndex = 12
-    btn.Parent = DetailActionFrame
+local ActionBtnFrame = Instance.new("Frame")
+ActionBtnFrame.Size = UDim2.new(1, -18, 0, 34)
+ActionBtnFrame.Position = UDim2.new(0, 9, 1, -42)
+ActionBtnFrame.BackgroundTransparency = 1
+ActionBtnFrame.Parent = DetailPanel
+
+local ActionLayout = Instance.new("UIListLayout")
+ActionLayout.FillDirection = Enum.FillDirection.Horizontal
+ActionLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+ActionLayout.Padding = UDim.new(0, 5)
+ActionLayout.Parent = ActionBtnFrame
+
+local function CreateActionButton(name, text)
+    local button = Instance.new("TextButton")
+    button.Name = name
+    button.Size = UDim2.new(0.31, 0, 1, 0)
+    button.BackgroundColor3 = Color3.fromRGB(39, 43, 55)
+    button.TextColor3 = Color3.fromRGB(240, 240, 245)
+    button.Font = Enum.Font.GothamBold
+    button.TextSize = 8
+    button.Text = text
+    button.AutoButtonColor = false
+    button.Parent = ActionBtnFrame
 
     local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 4)
-    corner.Parent = btn
+    corner.CornerRadius = UDim.new(0, 5)
+    corner.Parent = button
 
-    return btn
+    return button
 end
 
-local CopyNameBtn = CreateDetailActionButton("CopyName", "NAME")
-local CopyPathBtn = CreateDetailActionButton("CopyPath", "PATH")
-local CopyReqBtn = CreateDetailActionButton("CopyReq", "REQUEST")
+local CopyNameBtn = CreateActionButton(
+    "CopyNameBtn",
+    "COPY NAME"
+)
 
-local TabDefs = {
-    {"ALL", 65},
-    {"REMOTE EVENT", 95},
-    {"REMOTE FUNCTION", 110},
-    {"HISTORY", 65},
-    {"SETTINGS", 70}
+local CopyPathBtn = CreateActionButton(
+    "CopyPathBtn",
+    "COPY PATH"
+)
+
+local CopyReqBtn = CreateActionButton(
+    "CopyReqBtn",
+    "COPY REQ"
+)
+
+local TabList = {
+    "ALL",
+    "REMOTE EVENT",
+    "REMOTE FUNCTION",
+    "HISTORY",
+    "SETTINGS"
 }
 
-for _, def in ipairs(TabDefs) do
-    local tabName = def[1]
-    local tabWidth = def[2]
+for _, tabName in ipairs(TabList) do
+    local tabButton = Instance.new("TextButton")
+    tabButton.Name = tabName .. "_Btn"
+    tabButton.Size = UDim2.new(0, 114, 1, 0)
+    tabButton.BackgroundColor3 =
+        tabName == State.ActiveTab
+        and Color3.fromRGB(49, 53, 69)
+        or Color3.fromRGB(28, 30, 38)
+    tabButton.TextColor3 = Color3.fromRGB(240, 240, 250)
+    tabButton.Font = Enum.Font.GothamBold
+    tabButton.TextSize = 9
+    tabButton.Text = tabName
+    tabButton.AutoButtonColor = false
+    tabButton.Parent = NavFrame
 
-    local btn = Instance.new("TextButton")
-    btn.Name = tabName .. "_Btn"
-    btn.Size = UDim2.new(0, tabWidth, 1, 0)
-    btn.BackgroundColor3 = (tabName == ActiveTab) and Color3.fromRGB(42, 42, 54) or Color3.fromRGB(24, 24, 30)
-    btn.TextColor3 = Color3.fromRGB(240, 240, 240)
-    btn.Font = Enum.Font.GothamBold
-    btn.TextSize = 9
-    btn.Text = tabName
-    btn.Parent = NavScroll
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 6)
+    corner.Parent = tabButton
 
-    local btnCorner = Instance.new("UICorner")
-    btnCorner.CornerRadius = UDim.new(0, 5)
-    btnCorner.Parent = btn
+    UI.TabButtons[tabName] = tabButton
 
-    UIReferences.TabButtons[tabName] = btn
-
-    local scroll = Instance.new("ScrollingFrame")
-    scroll.Name = tabName .. "_Frame"
-    scroll.Size = UDim2.new(1, 0, 1, 0)
-    scroll.Position = UDim2.new(0, 0, 0, 0)
-    scroll.BackgroundTransparency = 1
-    scroll.ScrollBarThickness = 3
-    scroll.Visible = (tabName == ActiveTab)
-    scroll.CanvasSize = UDim2.new(0, 0, 0, 0)
-    scroll.Parent = ContentContainer
+    local tabFrame = Instance.new("ScrollingFrame")
+    tabFrame.Name = tabName .. "_Frame"
+    tabFrame.Size = UDim2.new(1, 0, 1, 0)
+    tabFrame.BackgroundTransparency = 1
+    tabFrame.BorderSizePixel = 0
+    tabFrame.ScrollBarThickness = 5
+    tabFrame.ScrollBarImageColor3 = Color3.fromRGB(65, 69, 84)
+    tabFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+    tabFrame.Visible = tabName == State.ActiveTab
+    tabFrame.Parent = ContentArea
 
     local layout = Instance.new("UIListLayout")
     layout.SortOrder = Enum.SortOrder.LayoutOrder
-    layout.Padding = UDim.new(0, 4)
-    layout.Parent = scroll
+    layout.Padding = UDim.new(0, 6)
+    layout.Parent = tabFrame
 
-    layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-        scroll.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y + 8)
+    layout:GetPropertyChangedSignal(
+        "AbsoluteContentSize"
+    ):Connect(function()
+        tabFrame.CanvasSize = UDim2.new(
+            0,
+            0,
+            0,
+            layout.AbsoluteContentSize.Y + 12
+        )
     end)
 
-    UIReferences.TabFrames[tabName] = scroll
+    UI.TabFrames[tabName] = tabFrame
 end
 
-local function UpdateDetailView(entry)
-    CurrentDetail = entry
+local function CreateSettingToggleRow(title, defaultValue, callback)
+    local row = Instance.new("Frame")
+    row.Size = UDim2.new(1, -8, 0, 40)
+    row.BackgroundColor3 = Color3.fromRGB(26, 28, 36)
+    row.Parent = UI.TabFrames["SETTINGS"]
+
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 6)
+    corner.Parent = row
+
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(0.7, 0, 1, 0)
+    label.Position = UDim2.new(0, 12, 0, 0)
+    label.BackgroundTransparency = 1
+    label.Font = Enum.Font.Gotham
+    label.TextSize = 11
+    label.TextColor3 = Color3.fromRGB(230, 230, 240)
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Text = title
+    label.Parent = row
+
+    local toggle = Instance.new("TextButton")
+    toggle.Size = UDim2.new(0, 64, 0, 26)
+    toggle.Position = UDim2.new(1, -76, 0.5, -13)
+    toggle.BackgroundColor3 =
+        defaultValue
+        and Color3.fromRGB(50, 150, 80)
+        or Color3.fromRGB(65, 68, 80)
+    toggle.Font = Enum.Font.GothamBold
+    toggle.TextSize = 10
+    toggle.TextColor3 = Color3.fromRGB(255, 255, 255)
+    toggle.Text = defaultValue and "ON" or "OFF"
+    toggle.AutoButtonColor = false
+    toggle.Parent = row
+
+    local toggleCorner = Instance.new("UICorner")
+    toggleCorner.CornerRadius = UDim.new(0, 5)
+    toggleCorner.Parent = toggle
+
+    local current = defaultValue
+
+    toggle.MouseButton1Click:Connect(function()
+        current = not current
+
+        toggle.Text = current and "ON" or "OFF"
+
+        TweenService:Create(
+            toggle,
+            TweenInfo.new(0.15),
+            {
+                BackgroundColor3 =
+                    current
+                    and Color3.fromRGB(50, 150, 80)
+                    or Color3.fromRGB(65, 68, 80)
+            }
+        ):Play()
+
+        callback(current)
+    end)
+
+    return {
+        Set = function(value)
+            current = value
+            toggle.Text = value and "ON" or "OFF"
+            toggle.BackgroundColor3 =
+                value
+                and Color3.fromRGB(50, 150, 80)
+                or Color3.fromRGB(65, 68, 80)
+        end
+    }
+end
+
+local SettingsScroll = UI.TabFrames["SETTINGS"]
+
+local AutoScrollRow = CreateSettingToggleRow(
+    "Auto Scroll to New Events",
+    Settings.AutoScroll,
+    function(value)
+        Settings.AutoScroll = value
+    end
+)
+
+local TimestampRow = CreateSettingToggleRow(
+    "Show Timestamps on Cards",
+    Settings.ShowTimestamp,
+    function(value)
+        Settings.ShowTimestamp = value
+    end
+)
+
+local FullPathRow = CreateSettingToggleRow(
+    "Show Full Path on Cards",
+    Settings.ShowFullPath,
+    function(value)
+        Settings.ShowFullPath = value
+    end
+)
+
+local MaxHistoryRow = Instance.new("Frame")
+MaxHistoryRow.Size = UDim2.new(1, -8, 0, 40)
+MaxHistoryRow.BackgroundColor3 = Color3.fromRGB(26, 28, 36)
+MaxHistoryRow.Parent = SettingsScroll
+
+local MaxHistoryCorner = Instance.new("UICorner")
+MaxHistoryCorner.CornerRadius = UDim.new(0, 6)
+MaxHistoryCorner.Parent = MaxHistoryRow
+
+local MaxHistoryLabel = Instance.new("TextLabel")
+MaxHistoryLabel.Size = UDim2.new(0.65, 0, 1, 0)
+MaxHistoryLabel.Position = UDim2.new(0, 12, 0, 0)
+MaxHistoryLabel.BackgroundTransparency = 1
+MaxHistoryLabel.Font = Enum.Font.Gotham
+MaxHistoryLabel.TextSize = 11
+MaxHistoryLabel.TextColor3 = Color3.fromRGB(230, 230, 240)
+MaxHistoryLabel.TextXAlignment = Enum.TextXAlignment.Left
+MaxHistoryLabel.Text = "Max History Limit"
+MaxHistoryLabel.Parent = MaxHistoryRow
+
+local MaxHistoryInput = Instance.new("TextBox")
+MaxHistoryInput.Size = UDim2.new(0, 76, 0, 26)
+MaxHistoryInput.Position = UDim2.new(1, -88, 0.5, -13)
+MaxHistoryInput.BackgroundColor3 = Color3.fromRGB(38, 42, 54)
+MaxHistoryInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+MaxHistoryInput.Font = Enum.Font.GothamBold
+MaxHistoryInput.TextSize = 10
+MaxHistoryInput.Text = tostring(Settings.MaxHistory)
+MaxHistoryInput.ClearTextOnFocus = false
+MaxHistoryInput.Parent = MaxHistoryRow
+
+local MaxHistoryInputCorner = Instance.new("UICorner")
+MaxHistoryInputCorner.CornerRadius = UDim.new(0, 5)
+MaxHistoryInputCorner.Parent = MaxHistoryInput
+
+MaxHistoryInput.FocusLost:Connect(function()
+    local number = tonumber(MaxHistoryInput.Text)
+
+    if number and number >= 10 and number <= 2000 then
+        Settings.MaxHistory = math.floor(number)
+    else
+        MaxHistoryInput.Text = tostring(Settings.MaxHistory)
+    end
+end)
+
+local function CreateSettingsButton(text, color, callback)
+    local button = Instance.new("TextButton")
+    button.Size = UDim2.new(1, -8, 0, 36)
+    button.BackgroundColor3 = color
+    button.TextColor3 = Color3.fromRGB(255, 255, 255)
+    button.Font = Enum.Font.GothamBold
+    button.TextSize = 10
+    button.Text = text
+    button.AutoButtonColor = false
+    button.Parent = SettingsScroll
+
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 6)
+    corner.Parent = button
+
+    button.MouseButton1Click:Connect(callback)
+
+    return button
+end
+
+local function UpdateDetailPanel(entry)
+    State.SelectedEntry = entry
+
     if not entry then
-        DetailTitle.Text = "DETAILS"
-        DetailContentText.Text = "Select an event card to inspect details."
-        DetailScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+        DetailSubHeader.Text = "Select a remote"
+
+        DetailText.Text =
+            "Select an event from the list to view its complete details."
+
+        DetailScroll.CanvasSize =
+            UDim2.new(0, 0, 0, 0)
+
         return
     end
 
-    DetailTitle.Text = string.upper(entry.Name)
+    DetailSubHeader.Text =
+        entry.Class .. "  •  " .. entry.Name
 
-    local text = string.format(
-        "Name: %s\nClass: %s\nPath: %s\nTimestamp: %s\nCalls: %d\n\nArguments:\n%s",
-        entry.Name,
-        entry.Class,
-        entry.Path,
-        entry.Timestamp,
-        entry.CallCount or 1,
-        FormatArgumentsList(entry.Args)
-    )
+    local lines = {}
 
-    if entry.Class == "RemoteFunction" and entry.ReturnValue ~= nil then
-        text = text .. "\n\nReturn Value:\n" .. FormatValue(entry.ReturnValue)
-    end
+    table.insert(lines, "NAME\n")
+    table.insert(lines, entry.Name)
+    table.insert(lines, "\n\n")
 
-    DetailContentText.Text = text
-    local actualWidth = DetailScroll.AbsoluteSize.X
-    local targetWidth = (actualWidth > 20) and (actualWidth - 8) or 160
-    local bounds = TextService:GetTextSize(text, 10, Enum.Font.Gotham, Vector2.new(targetWidth, 10000))
-    DetailContentText.Size = UDim2.new(1, -4, 0, bounds.Y + 14)
-    DetailScroll.CanvasSize = UDim2.new(0, 0, 0, bounds.Y + 28)
-end
+    table.insert(lines, "CLASS\n")
+    table.insert(lines, entry.Class)
+    table.insert(lines, "\n\n")
 
-local function ApplyLayout()
-    local vp = GetCurrentViewport()
-    local mwSize = MainWindow.AbsoluteSize
-    local isMobile = (vp.X < 540) or (mwSize.X < 450)
-    IsMobileLayout = isMobile
+    table.insert(lines, "PATH\n")
+    table.insert(lines, entry.Path)
+    table.insert(lines, "\n\n")
 
-    if isMobile then
-        ContentContainer.Size = UDim2.new(1, -12, 1, -104)
-        DetailPanel.Size = UDim2.new(1, -12, 1, -104)
-        DetailPanel.Position = UDim2.new(0, 6, 0, 100)
-        DetailBackBtn.Visible = true
-        DetailTitle.Position = UDim2.new(0, 44, 0, 0)
-        DetailTitle.Size = UDim2.new(1, -48, 1, 0)
-        DetailPanel.Visible = (CurrentDetail ~= nil)
-    else
-        ContentContainer.Size = UDim2.new(1, -195, 1, -104)
-        DetailPanel.Size = UDim2.new(0, 180, 1, -104)
-        DetailPanel.Position = UDim2.new(1, -186, 0, 100)
-        DetailBackBtn.Visible = false
-        DetailTitle.Position = UDim2.new(0, 5, 0, 0)
-        DetailTitle.Size = UDim2.new(1, -10, 1, 0)
-        DetailPanel.Visible = true
-    end
+    table.insert(lines, "CALL COUNT\n")
+    table.insert(lines, tostring(entry.CallCount or 1))
+    table.insert(lines, "\n\n")
 
-    if CurrentDetail then
-        task.defer(function()
-            UpdateDetailView(CurrentDetail)
-        end)
-    end
-end
+    table.insert(lines, "TIMESTAMP\n")
+    table.insert(lines, entry.Timestamp or "Unknown")
+    table.insert(lines, "\n\n")
 
-DetailBackBtn.Activated:Connect(function()
-    if IsMobileLayout then
-        DetailPanel.Visible = false
-    end
-end)
+    table.insert(lines, "REQUEST\n\n")
+    table.insert(lines, FormatArgsList(entry.Args))
 
-local function SetupDrag(dragHandle, targetFrame)
-    local isDragging = false
-    local dragInput = nil
-    local dragStart = nil
-    local startPos = nil
+    if entry.Class == "RemoteFunction" then
+        table.insert(lines, "\n\nRETURN\n\n")
 
-    dragHandle.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            isDragging = true
-            dragStart = input.Position
-            startPos = targetFrame.Position
-
-            local conn
-            conn = input.Changed:Connect(function()
-                if input.UserInputState == Enum.UserInputState.End then
-                    isDragging = false
-                    if conn then conn:Disconnect() end
-                end
-            end)
+        if entry.ReturnValue ~= nil then
+            table.insert(
+                lines,
+                FormatValue(entry.ReturnValue)
+            )
+        else
+            table.insert(lines, "None")
         end
-    end)
-
-    dragHandle.InputChanged:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
-            dragInput = input
-        end
-    end)
-
-    UserInputService.InputChanged:Connect(function(input)
-        if input == dragInput and isDragging then
-            local delta = input.Position - dragStart
-            local vp = GetCurrentViewport()
-            local frameSize = targetFrame.AbsoluteSize
-            local rawX = startPos.X.Offset + delta.X
-            local rawY = startPos.Y.Offset + delta.Y
-            local clampedX = math.clamp(rawX, 0, math.max(0, vp.X - frameSize.X))
-            local clampedY = math.clamp(rawY, 0, math.max(0, vp.Y - frameSize.Y))
-            targetFrame.Position = UDim2.new(0, clampedX, 0, clampedY)
-        end
-    end)
-end
-
-SetupDrag(DragArea, MainWindow)
-
-local floatDragging = false
-local floatActiveInput = nil
-local floatDragStart = nil
-local floatStartPos = nil
-local floatMovedDistance = 0
-
-FloatingButton.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        floatDragging = true
-        floatActiveInput = input
-        floatDragStart = input.Position
-        floatStartPos = FloatingButton.Position
-        floatMovedDistance = 0
-
-        local conn
-        conn = input.Changed:Connect(function()
-            if input.UserInputState == Enum.UserInputState.End then
-                if floatDragging and (input == floatActiveInput) then
-                    floatDragging = false
-                    if floatMovedDistance <= 9 then
-                        MainWindow.Visible = true
-                        FloatingButton.Visible = false
-                        ApplyLayout()
-                        TweenService:Create(MainWindow, TweenInfo.new(0.2, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
-                            BackgroundTransparency = 0
-                        }):Play()
-                    end
-                end
-                if conn then conn:Disconnect() end
-            end
-        end)
     end
-end)
 
-UserInputService.InputChanged:Connect(function(input)
-    if floatDragging and (input == floatActiveInput or input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-        local delta = input.Position - floatDragStart
-        floatMovedDistance = Vector2.new(delta.X, delta.Y).Magnitude
-        local vp = GetCurrentViewport()
-        local btnSize = FloatingButton.AbsoluteSize
-        local rawX = floatStartPos.X.Offset + delta.X
-        local rawY = floatStartPos.Y.Offset + delta.Y
-        local clampedX = math.clamp(rawX, 0, math.max(0, vp.X - btnSize.X))
-        local clampedY = math.clamp(rawY, 0, math.max(0, vp.Y - btnSize.Y))
-        FloatingButton.Position = UDim2.new(0, clampedX, 0, clampedY)
-    end
-end)
+    local fullText = table.concat(lines)
 
-local isMinimized = false
-local function ToggleWindow(visible)
-    if visible then
-        MainWindow.Visible = true
-        FloatingButton.Visible = false
-        ApplyLayout()
-        TweenService:Create(MainWindow, TweenInfo.new(0.2, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
-            BackgroundTransparency = 0
-        }):Play()
-    else
-        local tween = TweenService:Create(MainWindow, TweenInfo.new(0.18, Enum.EasingStyle.Quart, Enum.EasingDirection.In), {
-            BackgroundTransparency = 1
-        })
-        tween:Play()
-        tween.Completed:Connect(function()
-            MainWindow.Visible = false
-            FloatingButton.Visible = true
-        end)
-    end
-end
+    DetailText.Text = fullText
 
-CloseBtn.Activated:Connect(function()
-    ToggleWindow(false)
-end)
+    task.defer(function()
+        local width = math.max(
+            100,
+            DetailScroll.AbsoluteSize.X - 14
+        )
 
-MinBtn.Activated:Connect(function()
-    isMinimized = not isMinimized
-    local vp = GetCurrentViewport()
-    local winSize = CalculateWindowSize(vp)
-    local targetHeight = isMinimized and 34 or winSize.Y
-    TweenService:Create(MainWindow, TweenInfo.new(0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-        Size = UDim2.new(0, winSize.X, 0, targetHeight)
-    }):Play()
-end)
+        local bounds = TextService:GetTextSize(
+            fullText,
+            10,
+            Enum.Font.Gotham,
+            Vector2.new(width, 100000)
+        )
 
-local function SwitchTab(tabName)
-    ActiveTab = tabName
-    for name, frame in pairs(UIReferences.TabFrames) do
-        frame.Visible = (name == tabName)
-    end
-    for name, btn in pairs(UIReferences.TabButtons) do
-        local targetColor = (name == tabName) and Color3.fromRGB(42, 42, 54) or Color3.fromRGB(24, 24, 30)
-        TweenService:Create(btn, TweenInfo.new(0.12), {BackgroundColor3 = targetColor}):Play()
-    end
-end
+        DetailText.Size =
+            UDim2.new(1, -8, 0, bounds.Y + 10)
 
-for tabName, btn in pairs(UIReferences.TabButtons) do
-    btn.Activated:Connect(function()
-        SwitchTab(tabName)
+        DetailScroll.CanvasSize =
+            UDim2.new(0, 0, 0, bounds.Y + 20)
     end)
 end
 
-local function TriggerCopyFeedback(button, originalText, success)
-    if success then
-        button.Text = "COPIED!"
-        button.TextColor3 = Color3.fromRGB(100, 255, 120)
-    else
-        button.Text = "UNAVAILABLE"
-        button.TextColor3 = Color3.fromRGB(255, 100, 100)
-    end
-    task.delay(1.2, function()
-        button.Text = originalText
-        button.TextColor3 = Color3.fromRGB(240, 240, 240)
-    end)
-end
-
-CopyNameBtn.Activated:Connect(function()
-    if CurrentDetail and CurrentDetail.Name then
-        local ok = SafeSetClipboard(CurrentDetail.Name)
-        TriggerCopyFeedback(CopyNameBtn, "NAME", ok)
-    else
-        TriggerCopyFeedback(CopyNameBtn, "NAME", false)
+CopyNameBtn.MouseButton1Click:Connect(function()
+    if State.SelectedEntry then
+        SafeSetClipboard(
+            State.SelectedEntry.Name
+        )
     end
 end)
 
-CopyPathBtn.Activated:Connect(function()
-    if CurrentDetail and CurrentDetail.Path then
-        local ok = SafeSetClipboard(CurrentDetail.Path)
-        TriggerCopyFeedback(CopyPathBtn, "PATH", ok)
-    else
-        TriggerCopyFeedback(CopyPathBtn, "PATH", false)
+CopyPathBtn.MouseButton1Click:Connect(function()
+    if State.SelectedEntry then
+        SafeSetClipboard(
+            State.SelectedEntry.Path
+        )
     end
 end)
 
-CopyReqBtn.Activated:Connect(function()
-    if CurrentDetail and CurrentDetail.Args then
-        local rawArgs = FormatArgumentsList(CurrentDetail.Args)
-        local ok = SafeSetClipboard(rawArgs)
-        TriggerCopyFeedback(CopyReqBtn, "REQUEST", ok)
-    else
-        TriggerCopyFeedback(CopyReqBtn, "REQUEST", false)
+CopyReqBtn.MouseButton1Click:Connect(function()
+    if State.SelectedEntry then
+        SafeSetClipboard(
+            FormatArgsList(
+                State.SelectedEntry.Args
+            )
+        )
     end
 end)
 
-local function MatchesSearch(entry, query)
-    if not query or query == "" then return true end
-    query = string.lower(query)
-    if string.find(string.lower(entry.Name or ""), query, 1, true) then return true end
-    if string.find(string.lower(entry.Path or ""), query, 1, true) then return true end
-    if string.find(string.lower(entry.Class or ""), query, 1, true) then return true end
-    if entry.ArgsString and string.find(string.lower(entry.ArgsString), query, 1, true) then return true end
-    return false
-end
-
-local function SelectCard(card, entry)
-    if CurrentSelectedCard and CurrentSelectedCard.Parent then
-        CurrentSelectedCard.BackgroundColor3 = Color3.fromRGB(24, 24, 30)
-    end
-    CurrentSelectedCard = card
-    card.BackgroundColor3 = Color3.fromRGB(36, 36, 50)
-    UpdateDetailView(entry)
-    if IsMobileLayout then
-        DetailPanel.Visible = true
-    end
-end
-
-local function BuildCard(entry, parentFrame)
+local function CreateRemoteCard(entry, parent)
     local card = Instance.new("TextButton")
-    card.Name = "Card_" .. tostring(entry.Name)
-    card.Size = UDim2.new(1, -4, 0, 56)
-    card.BackgroundColor3 = Color3.fromRGB(24, 24, 30)
+    card.Name = "Card"
+    card.Size = UDim2.new(1, -6, 0, 82)
+    card.BackgroundColor3 = Color3.fromRGB(24, 26, 33)
     card.Text = ""
     card.AutoButtonColor = false
-    card.Active = true
-    card.Parent = parentFrame
+    card.Parent = parent
 
-    local cardCorner = Instance.new("UICorner")
-    cardCorner.CornerRadius = UDim.new(0, 5)
-    cardCorner.Parent = card
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 7)
+    corner.Parent = card
 
-    local cardPad = Instance.new("UIPadding")
-    cardPad.PaddingLeft = UDim.new(0, 6)
-    cardPad.PaddingRight = UDim.new(0, 6)
-    cardPad.PaddingTop = UDim.new(0, 4)
-    cardPad.PaddingBottom = UDim.new(0, 4)
-    cardPad.Parent = card
+    local stroke = Instance.new("UIStroke")
+    stroke.Color = Color3.fromRGB(55, 59, 73)
+    stroke.Transparency = 0.6
+    stroke.Thickness = 1
+    stroke.Parent = card
+
+    local padding = Instance.new("UIPadding")
+    padding.PaddingLeft = UDim.new(0, 10)
+    padding.PaddingRight = UDim.new(0, 10)
+    padding.PaddingTop = UDim.new(0, 7)
+    padding.PaddingBottom = UDim.new(0, 7)
+    padding.Parent = card
 
     local classLabel = Instance.new("TextLabel")
-    classLabel.Size = UDim2.new(0.55, 0, 0, 14)
+    classLabel.Size = UDim2.new(0.6, 0, 0, 16)
     classLabel.BackgroundTransparency = 1
     classLabel.Font = Enum.Font.GothamBold
     classLabel.TextSize = 10
-    classLabel.TextColor3 = (entry.Class == "RemoteEvent") and Color3.fromRGB(75, 155, 235) or Color3.fromRGB(235, 155, 75)
     classLabel.TextXAlignment = Enum.TextXAlignment.Left
-    classLabel.Text = entry.Class .. (entry.CallCount and (" (" .. tostring(entry.CallCount) .. ")") or "")
+    classLabel.TextColor3 =
+        entry.Class == "RemoteEvent"
+        and Color3.fromRGB(75, 165, 245)
+        or Color3.fromRGB(245, 165, 75)
+
+    classLabel.Text =
+        entry.Class
+        .. "  •  "
+        .. tostring(entry.CallCount or 1)
+        .. " calls"
+
     classLabel.Parent = card
 
     local timeLabel = Instance.new("TextLabel")
-    timeLabel.Size = UDim2.new(0.45, 0, 0, 14)
-    timeLabel.Position = UDim2.new(0.55, 0, 0, 0)
+    timeLabel.Size = UDim2.new(0.4, 0, 0, 16)
+    timeLabel.Position = UDim2.new(0.6, 0, 0, 0)
     timeLabel.BackgroundTransparency = 1
     timeLabel.Font = Enum.Font.Gotham
     timeLabel.TextSize = 9
-    timeLabel.TextColor3 = Color3.fromRGB(130, 130, 140)
+    timeLabel.TextColor3 = Color3.fromRGB(135, 140, 155)
     timeLabel.TextXAlignment = Enum.TextXAlignment.Right
-    timeLabel.Text = SettingsState.ShowTimestamp and entry.Timestamp or ""
+    timeLabel.Text =
+        Settings.ShowTimestamp
+        and entry.Timestamp
+        or ""
+
     timeLabel.Parent = card
 
     local pathLabel = Instance.new("TextLabel")
-    pathLabel.Size = UDim2.new(1, 0, 0, 14)
-    pathLabel.Position = UDim2.new(0, 0, 0, 15)
+    pathLabel.Size = UDim2.new(1, 0, 0, 17)
+    pathLabel.Position = UDim2.new(0, 0, 0, 19)
     pathLabel.BackgroundTransparency = 1
     pathLabel.Font = Enum.Font.GothamMedium
     pathLabel.TextSize = 10
-    pathLabel.TextColor3 = Color3.fromRGB(235, 235, 235)
+    pathLabel.TextColor3 = Color3.fromRGB(240, 240, 245)
     pathLabel.TextXAlignment = Enum.TextXAlignment.Left
     pathLabel.TextTruncate = Enum.TextTruncate.AtEnd
-    pathLabel.Text = SettingsState.ShowFullPath and entry.Path or entry.Name
+
+    pathLabel.Text =
+        Settings.ShowFullPath
+        and entry.Path
+        or entry.Name
+
     pathLabel.Parent = card
 
-    local previewLabel = Instance.new("TextLabel")
-    previewLabel.Size = UDim2.new(1, 0, 0, 16)
-    previewLabel.Position = UDim2.new(0, 0, 0, 30)
-    previewLabel.BackgroundTransparency = 1
-    previewLabel.Font = Enum.Font.Gotham
-    previewLabel.TextSize = 9
-    previewLabel.TextColor3 = Color3.fromRGB(150, 150, 160)
-    previewLabel.TextXAlignment = Enum.TextXAlignment.Left
-    previewLabel.TextTruncate = Enum.TextTruncate.AtEnd
+    local argsLabel = Instance.new("TextLabel")
+    argsLabel.Size = UDim2.new(1, 0, 0, 27)
+    argsLabel.Position = UDim2.new(0, 0, 0, 40)
+    argsLabel.BackgroundTransparency = 1
+    argsLabel.Font = Enum.Font.Gotham
+    argsLabel.TextSize = 9
+    argsLabel.TextColor3 = Color3.fromRGB(155, 160, 175)
+    argsLabel.TextXAlignment = Enum.TextXAlignment.Left
+    argsLabel.TextTruncate = Enum.TextTruncate.AtEnd
 
-    local previewText = "Args: "
     if #entry.Args == 0 then
-        previewText = previewText .. "None"
+        argsLabel.Text = "Request: None"
     else
-        for i, a in ipairs(entry.Args) do
-            previewText = previewText .. string.format("[%d] %s  ", i, typeof(a))
-            if i >= 2 then
-                if #entry.Args > 2 then previewText = previewText .. "..." end
+        local preview = {}
+
+        for index, value in ipairs(entry.Args) do
+            local valueText
+
+            if typeof(value) == "string" then
+                valueText = string.format(
+                    "%q",
+                    value
+                )
+            else
+                valueText = tostring(value)
+            end
+
+            table.insert(
+                preview,
+                string.format(
+                    "[%d] %s",
+                    index,
+                    valueText
+                )
+            )
+
+            if index >= 3 then
+                table.insert(preview, "...")
                 break
             end
         end
-    end
-    previewLabel.Text = previewText
-    previewLabel.Parent = card
 
-    card.Activated:Connect(function()
-        SelectCard(card, entry)
+        argsLabel.Text =
+            "Request: "
+            .. table.concat(preview, "  ")
+    end
+
+    argsLabel.Parent = card
+
+    card.MouseEnter:Connect(function()
+        TweenService:Create(
+            card,
+            TweenInfo.new(0.12),
+            {
+                BackgroundColor3 =
+                    Color3.fromRGB(31, 34, 44)
+            }
+        ):Play()
+    end)
+
+    card.MouseLeave:Connect(function()
+        TweenService:Create(
+            card,
+            TweenInfo.new(0.12),
+            {
+                BackgroundColor3 =
+                    Color3.fromRGB(24, 26, 33)
+            }
+        ):Play()
+    end)
+
+    card.MouseButton1Click:Connect(function()
+        UpdateDetailPanel(entry)
+
+        TweenService:Create(
+            DetailPanel,
+            TweenInfo.new(
+                0.12,
+                Enum.EasingStyle.Quad,
+                Enum.EasingDirection.Out
+            ),
+            {
+                BackgroundColor3 =
+                    Color3.fromRGB(27, 29, 37)
+            }
+        ):Play()
+
+        task.delay(0.14, function()
+            TweenService:Create(
+                DetailPanel,
+                TweenInfo.new(0.12),
+                {
+                    BackgroundColor3 =
+                        Color3.fromRGB(23, 25, 32)
+                }
+            ):Play()
+        end)
     end)
 
     return card
 end
 
-local function RegisterEntry(entry)
-    entry.ArgsString = FormatArgumentsList(entry.Args)
-
-    table.insert(HistoryData, entry)
-    if #HistoryData > SettingsState.MaxHistory then
-        table.remove(HistoryData, 1)
+local function PassesFilter(entry, query)
+    if not query or query == "" then
+        return true
     end
 
-    local function AddToTargetTab(targetTab)
-        local frame = UIReferences.TabFrames[targetTab]
-        if not frame then return end
-        local card = BuildCard(entry, frame)
-        card.Visible = MatchesSearch(entry, SearchQuery)
-        table.insert(UIReferences.CardsByTab[targetTab], {Card = card, Entry = entry})
+    query = string.lower(query)
 
-        if #UIReferences.CardsByTab[targetTab] > SettingsState.MaxHistory then
-            local oldest = table.remove(UIReferences.CardsByTab[targetTab], 1)
-            if oldest and oldest.Card then
-                if CurrentSelectedCard == oldest.Card then
-                    CurrentSelectedCard = nil
-                end
-                oldest.Card:Destroy()
-            end
+    if string.find(
+        string.lower(entry.Name),
+        query,
+        1,
+        true
+    ) then
+        return true
+    end
+
+    if string.find(
+        string.lower(entry.Path),
+        query,
+        1,
+        true
+    ) then
+        return true
+    end
+
+    if string.find(
+        string.lower(entry.Class),
+        query,
+        1,
+        true
+    ) then
+        return true
+    end
+
+    for _, argument in ipairs(entry.Args) do
+        local value = string.lower(
+            tostring(argument)
+        )
+
+        local argumentType = string.lower(
+            typeof(argument)
+        )
+
+        if string.find(
+            value,
+            query,
+            1,
+            true
+        ) then
+            return true
         end
 
-        if SettingsState.AutoScroll and ActiveTab == targetTab then
-            frame.CanvasPosition = Vector2.new(0, math.max(0, frame.CanvasSize.Y.Offset - frame.AbsoluteSize.Y))
+        if string.find(
+            argumentType,
+            query,
+            1,
+            true
+        ) then
+            return true
         end
     end
 
-    AddToTargetTab("ALL")
-    AddToTargetTab("HISTORY")
-    if entry.Class == "RemoteEvent" then
-        AddToTargetTab("REMOTE EVENT")
-    elseif entry.Class == "RemoteFunction" then
-        AddToTargetTab("REMOTE FUNCTION")
+    return false
+end
+
+local function ClearCards(frame)
+    if not frame then
+        return
+    end
+
+    for _, child in ipairs(frame:GetChildren()) do
+        if child:IsA("TextButton") then
+            child:Destroy()
+        end
     end
 end
 
-local function RefreshSearchFilter()
-    for _, cardList in pairs(UIReferences.CardsByTab) do
-        for _, item in ipairs(cardList) do
-            item.Card.Visible = MatchesSearch(item.Entry, SearchQuery)
+local function RebuildTabUI(tabName)
+    local frame = UI.TabFrames[tabName]
+
+    if not frame or tabName == "SETTINGS" then
+        return
+    end
+
+    ClearCards(frame)
+
+    local entries
+
+    if tabName == "HISTORY" then
+        entries = State.History
+    else
+        entries = State.TabEntries[tabName]
+    end
+
+    if not entries then
+        return
+    end
+
+    for _, entry in ipairs(entries) do
+        if PassesFilter(
+            entry,
+            State.SearchQuery
+        ) then
+            CreateRemoteCard(
+                entry,
+                frame
+            )
         end
     end
-end
 
-SearchBox:GetPropertyChangedSignal("Text"):Connect(function()
-    SearchQuery = SearchBox.Text
-    RefreshSearchFilter()
-end)
+    task.defer(function()
+        local layout =
+            frame:FindFirstChildOfClass(
+                "UIListLayout"
+            )
 
-local SettingsFrame = UIReferences.TabFrames["SETTINGS"]
+        if not layout then
+            return
+        end
 
-local function CreateSettingToggle(title, defaultVal, callback)
-    local frame = Instance.new("Frame")
-    frame.Size = UDim2.new(1, -6, 0, 30)
-    frame.BackgroundColor3 = Color3.fromRGB(24, 24, 30)
-    frame.Parent = SettingsFrame
+        frame.CanvasSize =
+            UDim2.new(
+                0,
+                0,
+                0,
+                layout.AbsoluteContentSize.Y + 12
+            )
 
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 5)
-    corner.Parent = frame
+        if Settings.AutoScroll
+            and tabName == State.ActiveTab then
 
-    local label = Instance.new("TextLabel")
-    label.Size = UDim2.new(0.7, 0, 1, 0)
-    label.Position = UDim2.new(0, 8, 0, 0)
-    label.BackgroundTransparency = 1
-    label.Font = Enum.Font.Gotham
-    label.TextSize = 10
-    label.TextColor3 = Color3.fromRGB(220, 220, 220)
-    label.TextXAlignment = Enum.TextXAlignment.Left
-    label.Text = title
-    label.Parent = frame
-
-    local toggle = Instance.new("TextButton")
-    toggle.Size = UDim2.new(0, 48, 0, 20)
-    toggle.Position = UDim2.new(1, -54, 0.5, -10)
-    toggle.BackgroundColor3 = defaultVal and Color3.fromRGB(50, 130, 65) or Color3.fromRGB(55, 55, 65)
-    toggle.Font = Enum.Font.GothamBold
-    toggle.TextSize = 9
-    toggle.TextColor3 = Color3.fromRGB(255, 255, 255)
-    toggle.Text = defaultVal and "ON" or "OFF"
-    toggle.Parent = frame
-
-    local toggleCorner = Instance.new("UICorner")
-    toggleCorner.CornerRadius = UDim.new(0, 4)
-    toggleCorner.Parent = toggle
-
-    local current = defaultVal
-    toggle.Activated:Connect(function()
-        current = not current
-        toggle.Text = current and "ON" or "OFF"
-        TweenService:Create(toggle, TweenInfo.new(0.15), {
-            BackgroundColor3 = current and Color3.fromRGB(50, 130, 65) or Color3.fromRGB(55, 55, 65)
-        }):Play()
-        callback(current)
+            frame.CanvasPosition =
+                Vector2.new(
+                    0,
+                    math.max(
+                        0,
+                        layout.AbsoluteContentSize.Y
+                            - frame.AbsoluteSize.Y
+                            + 20
+                    )
+                )
+        end
     end)
 end
 
-CreateSettingToggle("Auto Scroll", SettingsState.AutoScroll, function(v)
-    SettingsState.AutoScroll = v
-end)
-
-CreateSettingToggle("Timestamp Display", SettingsState.ShowTimestamp, function(v)
-    SettingsState.ShowTimestamp = v
-end)
-
-CreateSettingToggle("Full Path Display", SettingsState.ShowFullPath, function(v)
-    SettingsState.ShowFullPath = v
-end)
-
-local function CreateActionButton(text, color, callback)
-    local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(1, -6, 0, 28)
-    btn.BackgroundColor3 = color
-    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    btn.Font = Enum.Font.GothamBold
-    btn.TextSize = 10
-    btn.Text = text
-    btn.Parent = SettingsFrame
-
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 5)
-    corner.Parent = btn
-
-    btn.Activated:Connect(callback)
-    return btn
+local function RefreshAllTabs()
+    RebuildTabUI("ALL")
+    RebuildTabUI("REMOTE EVENT")
+    RebuildTabUI("REMOTE FUNCTION")
+    RebuildTabUI("HISTORY")
 end
 
-local function ClearTab(tabName)
-    local cardList = UIReferences.CardsByTab[tabName]
-    if cardList then
-        for _, item in ipairs(cardList) do
-            if item.Card then
-                if CurrentSelectedCard == item.Card then
-                    CurrentSelectedCard = nil
-                end
-                item.Card:Destroy()
+local function RecordEvent(
+    instance,
+    classType,
+    args,
+    returnValue
+)
+    if not instance then
+        return
+    end
+
+    local path = GetFullPath(instance)
+    local name = instance.Name
+
+    State.CallCounters[instance] =
+        (State.CallCounters[instance] or 0) + 1
+
+    local entry = {
+        Instance = instance,
+        Name = name,
+        Class = classType,
+        Path = path,
+        Timestamp = GetTimestamp(),
+        CallCount = State.CallCounters[instance],
+        Args = args or {},
+        ReturnValue = returnValue
+    }
+
+    table.insert(
+        State.History,
+        entry
+    )
+
+    if #State.History > Settings.MaxHistory then
+        table.remove(
+            State.History,
+            1
+        )
+    end
+
+    table.insert(
+        State.TabEntries["ALL"],
+        entry
+    )
+
+    if #State.TabEntries["ALL"]
+        > Settings.MaxHistory then
+
+        table.remove(
+            State.TabEntries["ALL"],
+            1
+        )
+    end
+
+    if classType == "RemoteEvent" then
+        table.insert(
+            State.TabEntries["REMOTE EVENT"],
+            entry
+        )
+
+        if #State.TabEntries["REMOTE EVENT"]
+            > Settings.MaxHistory then
+
+            table.remove(
+                State.TabEntries["REMOTE EVENT"],
+                1
+            )
+        end
+
+    elseif classType == "RemoteFunction" then
+        table.insert(
+            State.TabEntries["REMOTE FUNCTION"],
+            entry
+        )
+
+        if #State.TabEntries["REMOTE FUNCTION"]
+            > Settings.MaxHistory then
+
+            table.remove(
+                State.TabEntries["REMOTE FUNCTION"],
+                1
+            )
+        end
+    end
+
+    if PassesFilter(
+        entry,
+        State.SearchQuery
+    ) then
+
+        local activeTab =
+            State.ActiveTab
+
+        local shouldShow =
+            activeTab == "ALL"
+            or activeTab == "HISTORY"
+            or (
+                activeTab == "REMOTE EVENT"
+                and classType == "RemoteEvent"
+            )
+            or (
+                activeTab == "REMOTE FUNCTION"
+                and classType == "RemoteFunction"
+            )
+
+        if shouldShow then
+            local frame =
+                UI.TabFrames[activeTab]
+
+            if frame then
+                CreateRemoteCard(
+                    entry,
+                    frame
+                )
+
+                task.defer(function()
+                    if not Settings.AutoScroll then
+                        return
+                    end
+
+                    local layout =
+                        frame:FindFirstChildOfClass(
+                            "UIListLayout"
+                        )
+
+                    if layout then
+                        frame.CanvasPosition =
+                            Vector2.new(
+                                0,
+                                math.max(
+                                    0,
+                                    layout.AbsoluteContentSize.Y
+                                        - frame.AbsoluteSize.Y
+                                        + 20
+                                )
+                            )
+                    end
+                end)
             end
         end
-        UIReferences.CardsByTab[tabName] = {}
     end
 end
 
-CreateActionButton("Clear Current Tab", Color3.fromRGB(130, 75, 40), function()
-    if ActiveTab ~= "SETTINGS" then
-        ClearTab(ActiveTab)
+CreateSettingsButton(
+    "Clear All History",
+    Color3.fromRGB(145, 45, 52),
+    function()
+        table.clear(State.History)
+        table.clear(State.TabEntries["ALL"])
+        table.clear(State.TabEntries["REMOTE EVENT"])
+        table.clear(State.TabEntries["REMOTE FUNCTION"])
+
+        RefreshAllTabs()
+
+        UpdateDetailPanel(nil)
     end
+)
+
+CreateSettingsButton(
+    "Clear Current Tab",
+    Color3.fromRGB(130, 85, 45),
+    function()
+        if State.ActiveTab == "SETTINGS" then
+            return
+        end
+
+        if State.ActiveTab == "HISTORY" then
+            table.clear(State.History)
+        elseif State.TabEntries[State.ActiveTab] then
+            table.clear(
+                State.TabEntries[State.ActiveTab]
+            )
+        end
+
+        RebuildTabUI(
+            State.ActiveTab
+        )
+
+        UpdateDetailPanel(nil)
+    end
+)
+
+CreateSettingsButton(
+    "Reset Settings to Default",
+    Color3.fromRGB(48, 52, 68),
+    function()
+        Settings.AutoScroll =
+            DefaultSettings.AutoScroll
+
+        Settings.ShowTimestamp =
+            DefaultSettings.ShowTimestamp
+
+        Settings.ShowFullPath =
+            DefaultSettings.ShowFullPath
+
+        Settings.MaxHistory =
+            DefaultSettings.MaxHistory
+
+        AutoScrollRow.Set(
+            Settings.AutoScroll
+        )
+
+        TimestampRow.Set(
+            Settings.ShowTimestamp
+        )
+
+        FullPathRow.Set(
+            Settings.ShowFullPath
+        )
+
+        MaxHistoryInput.Text =
+            tostring(Settings.MaxHistory)
+
+        RefreshAllTabs()
+    end
+)
+
+local SearchThread
+
+SearchBox:GetPropertyChangedSignal(
+    "Text"
+):Connect(function()
+    State.SearchQuery =
+        SearchBox.Text
+
+    if SearchThread then
+        task.cancel(SearchThread)
+    end
+
+    SearchThread = task.delay(
+        0.18,
+        function()
+            RebuildTabUI(
+                State.ActiveTab
+            )
+        end
+    )
 end)
 
-CreateActionButton("Clear History", Color3.fromRGB(130, 40, 40), function()
-    table.clear(HistoryData)
-    for tab, _ in pairs(UIReferences.CardsByTab) do
-        ClearTab(tab)
+local function SwitchTab(tabName)
+    State.ActiveTab = tabName
+
+    for name, frame in pairs(
+        UI.TabFrames
+    ) do
+        frame.Visible =
+            name == tabName
     end
-    CurrentSelectedCard = nil
-    UpdateDetailView(nil)
-    if IsMobileLayout then
-        DetailPanel.Visible = false
+
+    for name, button in pairs(
+        UI.TabButtons
+    ) do
+        local target =
+            name == tabName
+            and Color3.fromRGB(49, 53, 69)
+            or Color3.fromRGB(28, 30, 38)
+
+        TweenService:Create(
+            button,
+            TweenInfo.new(0.15),
+            {
+                BackgroundColor3 = target
+            }
+        ):Play()
     end
+
+    if tabName ~= "SETTINGS" then
+        RebuildTabUI(tabName)
+    end
+end
+
+local function AttachPressAnimation(button)
+    button.InputBegan:Connect(function(input)
+        if input.UserInputType
+            == Enum.UserInputType.MouseButton1
+            or input.UserInputType
+            == Enum.UserInputType.Touch then
+
+            TweenService:Create(
+                button,
+                TweenInfo.new(0.08),
+                {
+                    BackgroundTransparency = 0.2
+                }
+            ):Play()
+        end
+    end)
+
+    button.InputEnded:Connect(function(input)
+        if input.UserInputType
+            == Enum.UserInputType.MouseButton1
+            or input.UserInputType
+            == Enum.UserInputType.Touch then
+
+            TweenService:Create(
+                button,
+                TweenInfo.new(0.12),
+                {
+                    BackgroundTransparency = 0
+                }
+            ):Play()
+        end
+    end)
+end
+
+for name, button in pairs(
+    UI.TabButtons
+) do
+    AttachPressAnimation(button)
+
+    button.MouseButton1Click:Connect(function()
+        SwitchTab(name)
+    end)
+end
+
+AttachPressAnimation(CloseBtn)
+AttachPressAnimation(MinBtn)
+AttachPressAnimation(FloatingBtn)
+
+local isDragging = false
+local dragStart
+local frameStart
+
+Header.InputBegan:Connect(function(input)
+    if input.UserInputType
+        ~= Enum.UserInputType.MouseButton1
+        and input.UserInputType
+        ~= Enum.UserInputType.Touch then
+
+        return
+    end
+
+    isDragging = true
+    dragStart = input.Position
+    frameStart = MainWindow.Position
+
+    local connection
+
+    connection = input.Changed:Connect(function()
+        if input.UserInputState
+            == Enum.UserInputState.End then
+
+            isDragging = false
+
+            if connection then
+                connection:Disconnect()
+            end
+        end
+    end)
 end)
 
-local StatusLabel = Instance.new("TextLabel")
-StatusLabel.Size = UDim2.new(1, -6, 0, 20)
-StatusLabel.BackgroundTransparency = 1
-StatusLabel.Font = Enum.Font.Gotham
-StatusLabel.TextSize = 9
-StatusLabel.TextColor3 = Color3.fromRGB(90, 210, 140)
-StatusLabel.Text = "Status: Client-Side Listener Active (OnClientEvent & OnClientInvoke)"
-StatusLabel.Parent = SettingsFrame
+TrackConnection(
+    UserInputService.InputChanged:Connect(function(input)
+        if not isDragging then
+            return
+        end
 
-local HookedInstances = {}
+        if input.UserInputType
+            ~= Enum.UserInputType.MouseMovement
+            and input.UserInputType
+            ~= Enum.UserInputType.Touch then
 
-local function HookRemote(instance)
-    if not instance or typeof(instance) ~= "Instance" then return end
-    if HookedInstances[instance] then return end
-    HookedInstances[instance] = true
+            return
+        end
+
+        local delta =
+            input.Position - dragStart
+
+        MainWindow.Position =
+            UDim2.new(
+                frameStart.X.Scale,
+                frameStart.X.Offset + delta.X,
+                frameStart.Y.Scale,
+                frameStart.Y.Offset + delta.Y
+            )
+    end)
+)
+
+local OriginalSize =
+    MainWindow.Size
+
+local function AnimateWindowOpen()
+    State.IsClosed = false
+
+    FloatingBtn.Visible = false
+    MainWindow.Visible = true
+
+    if State.IsMinimized then
+        State.IsMinimized = false
+    end
+
+    MainWindow.Size =
+        UDim2.new(
+            0,
+            OriginalSize.X.Offset * 0.88,
+            0,
+            OriginalSize.Y.Offset * 0.88
+        )
+
+    MainWindow.BackgroundTransparency = 1
+
+    TweenService:Create(
+        MainWindow,
+        TweenInfo.new(
+            0.25,
+            Enum.EasingStyle.Quart,
+            Enum.EasingDirection.Out
+        ),
+        {
+            Size = OriginalSize,
+            BackgroundTransparency = 0
+        }
+    ):Play()
+end
+
+local function AnimateWindowClose()
+    State.IsClosed = true
+
+    local tween =
+        TweenService:Create(
+            MainWindow,
+            TweenInfo.new(
+                0.2,
+                Enum.EasingStyle.Quart,
+                Enum.EasingDirection.In
+            ),
+            {
+                Size =
+                    UDim2.new(
+                        0,
+                        OriginalSize.X.Offset * 0.88,
+                        0,
+                        OriginalSize.Y.Offset * 0.88
+                    ),
+                BackgroundTransparency = 1
+            }
+        )
+
+    tween:Play()
+
+    tween.Completed:Connect(function()
+        if State.IsClosed then
+            MainWindow.Visible = false
+            FloatingBtn.Visible = true
+        end
+    end)
+end
+
+CloseBtn.MouseButton1Click:Connect(
+    AnimateWindowClose
+)
+
+FloatingBtn.MouseButton1Click:Connect(
+    AnimateWindowOpen
+)
+
+MinBtn.MouseButton1Click:Connect(function()
+    State.IsMinimized =
+        not State.IsMinimized
+
+    local targetHeight =
+        State.IsMinimized
+        and 44
+        or OriginalSize.Y.Offset
+
+    TweenService:Create(
+        MainWindow,
+        TweenInfo.new(
+            0.22,
+            Enum.EasingStyle.Quad,
+            Enum.EasingDirection.Out
+        ),
+        {
+            Size =
+                UDim2.new(
+                    0,
+                    OriginalSize.X.Offset,
+                    0,
+                    targetHeight
+                )
+        }
+    ):Play()
+end)
+
+local function SafeRecord(
+    instance,
+    classType,
+    args,
+    returnValue
+)
+    if not instance then
+        return
+    end
+
+    task.spawn(function()
+        pcall(function()
+            RecordEvent(
+                instance,
+                classType,
+                args or {},
+                returnValue
+            )
+        end)
+    end)
+end
+
+local function HookRemoteInstance(instance)
+    if not instance then
+        return
+    end
+
+    if State.MonitoredRemotes[instance] then
+        return
+    end
+
+    if not (
+        instance:IsA("RemoteEvent")
+        or instance:IsA("RemoteFunction")
+    ) then
+        return
+    end
+
+    State.MonitoredRemotes[instance] = true
 
     if instance:IsA("RemoteEvent") then
-        local fullPath = GetInstanceFullPath(instance)
-        RemoteStats[fullPath] = (RemoteStats[fullPath] or 0)
-
-        local conn
-        local success, _ = pcall(function()
-            conn = instance.OnClientEvent:Connect(function(...)
-                local args = {...}
-                RemoteStats[fullPath] = (RemoteStats[fullPath] or 0) + 1
-                RegisterEntry({
-                    Name = instance.Name,
-                    Class = "RemoteEvent",
-                    Path = fullPath,
-                    Timestamp = GetCurrentTimestamp(),
-                    CallCount = RemoteStats[fullPath],
-                    Args = args
-                })
+        local ok, connection =
+            pcall(function()
+                return instance.OnClientEvent:Connect(
+                    function(...)
+                        SafeRecord(
+                            instance,
+                            "RemoteEvent",
+                            {...},
+                            nil
+                        )
+                    end
+                )
             end)
-        end)
-        if success and conn then
-            table.insert(Connections, conn)
-        end
-    elseif instance:IsA("RemoteFunction") then
-        local fullPath = GetInstanceFullPath(instance)
-        RemoteStats[fullPath] = (RemoteStats[fullPath] or 0)
 
+        if ok and connection then
+            TrackConnection(connection)
+        end
+    end
+
+    if instance:IsA("RemoteFunction") then
         pcall(function()
-            local originalCallback = instance.OnClientInvoke
-            instance.OnClientInvoke = function(...)
-                local args = {...}
-                RemoteStats[fullPath] = (RemoteStats[fullPath] or 0) + 1
-                local retVal = nil
-                if originalCallback then
-                    retVal = originalCallback(...)
+            local original =
+                instance.OnClientInvoke
+
+            if typeof(original) ~= "function" then
+                return
+            end
+
+            if HookState.WrappedInvoke[instance] then
+                return
+            end
+
+            HookState.WrappedInvoke[instance] = true
+
+            instance.OnClientInvoke =
+                function(...)
+                    local args = {...}
+
+                    local packed =
+                        table.pack(
+                            original(...)
+                        )
+
+                    local returnValue
+
+                    if packed.n == 0 then
+                        returnValue = nil
+                    elseif packed.n == 1 then
+                        returnValue = packed[1]
+                    else
+                        returnValue = {}
+
+                        for i = 1, packed.n do
+                            returnValue[i] =
+                                packed[i]
+                        end
+                    end
+
+                    SafeRecord(
+                        instance,
+                        "RemoteFunction",
+                        args,
+                        returnValue
+                    )
+
+                    return table.unpack(
+                        packed,
+                        1,
+                        packed.n
+                    )
                 end
-                RegisterEntry({
-                    Name = instance.Name,
-                    Class = "RemoteFunction",
-                    Path = fullPath,
-                    Timestamp = GetCurrentTimestamp(),
-                    CallCount = RemoteStats[fullPath],
-                    Args = args,
-                    ReturnValue = retVal
-                })
-                return retVal
-            end
         end)
     end
 end
 
-local function ScanAndBind(root)
-    pcall(function()
-        for _, descendant in ipairs(root:GetDescendants()) do
-            if descendant:IsA("RemoteEvent") or descendant:IsA("RemoteFunction") then
-                HookRemote(descendant)
-            end
-        end
-    end)
-end
-
-local TargetServices = {
-    game:GetService("ReplicatedStorage"),
-    game:GetService("Players"),
-    game:GetService("Lighting")
-}
-
-for _, svc in ipairs(TargetServices) do
-    ScanAndBind(svc)
-    local addedConn = svc.DescendantAdded:Connect(function(descendant)
-        if descendant:IsA("RemoteEvent") or descendant:IsA("RemoteFunction") then
-            HookRemote(descendant)
-        end
-    end)
-    table.insert(Connections, addedConn)
-end
-
-local function OnViewportChanged()
-    local vp = GetCurrentViewport()
-    local targetSize = CalculateWindowSize(vp)
-    if not isMinimized then
-        MainWindow.Size = UDim2.new(0, targetSize.X, 0, targetSize.Y)
-    else
-        MainWindow.Size = UDim2.new(0, targetSize.X, 0, 34)
+local function InstallNamecallMonitor()
+    if HookState.Installed then
+        return true
     end
-    local currentPos = MainWindow.Position
-    local clampedX = math.clamp(currentPos.X.Offset, 0, math.max(0, vp.X - targetSize.X))
-    local clampedY = math.clamp(currentPos.Y.Offset, 0, math.max(0, vp.Y - (isMinimized and 34 or targetSize.Y)))
-    MainWindow.Position = UDim2.new(0, clampedX, 0, clampedY)
-    ApplyLayout()
-end
 
-if Camera then
-    local vpConn = Camera:GetPropertyChangedSignal("ViewportSize"):Connect(OnViewportChanged)
-    table.insert(Connections, vpConn)
-end
+    if not ExecutorAPIs.HasNamecallHook
+        or not ExecutorAPIs.HasNamecallMethod then
 
-ApplyLayout()
+        return false
+    end
 
-ScreenGui.Destroying:Connect(function()
-    for _, conn in ipairs(Connections) do
+    local success, old =
         pcall(function()
-            conn:Disconnect()
+            return hookmetamethod(
+                game,
+                "__namecall",
+                function(self, ...)
+                    local method =
+                        getnamecallmethod()
+
+                    local isRemote =
+                        typeof(self)
+                        == "Instance"
+                        and (
+                            self:IsA("RemoteEvent")
+                            or self:IsA("RemoteFunction")
+                        )
+
+                    if isRemote then
+                        if method == "FireServer" then
+                            SafeRecord(
+                                self,
+                                "RemoteEvent",
+                                {...},
+                                nil
+                            )
+                        elseif method == "InvokeServer" then
+                            local args = {...}
+
+                            local packed =
+                                table.pack(
+                                    old(
+                                        self,
+                                        ...
+                                    )
+                                )
+
+                            local returnValue
+
+                            if packed.n == 0 then
+                                returnValue = nil
+                            elseif packed.n == 1 then
+                                returnValue = packed[1]
+                            else
+                                returnValue = {}
+
+                                for i = 1, packed.n do
+                                    returnValue[i] =
+                                        packed[i]
+                                end
+                            end
+
+                            SafeRecord(
+                                self,
+                                "RemoteFunction",
+                                args,
+                                returnValue
+                            )
+
+                            return table.unpack(
+                                packed,
+                                1,
+                                packed.n
+                            )
+                        end
+                    end
+
+                    return old(
+                        self,
+                        ...
+                    )
+                end
+            )
         end)
+
+    if not success or not old then
+        return false
     end
-    table.clear(Connections)
-    table.clear(HistoryData)
-    table.clear(RemoteStats)
-    table.clear(HookedInstances)
-    table.clear(UIReferences.CardsByTab)
-    table.clear(UIReferences.TabButtons)
-    table.clear(UIReferences.TabFrames)
+
+    HookState.OldNamecall = old
+    HookState.Installed = true
+
+    return true
+end
+
+local function ScanAndObserve(container)
+    if not container then
+        return
+    end
+
+    pcall(function()
+        for _, descendant in ipairs(
+            container:GetDescendants()
+        ) do
+            if descendant:IsA("RemoteEvent")
+                or descendant:IsA("RemoteFunction") then
+
+                HookRemoteInstance(
+                    descendant
+                )
+            end
+        end
+
+        local connection =
+            container.DescendantAdded:Connect(
+                function(descendant)
+                    if descendant:IsA("RemoteEvent")
+                        or descendant:IsA("RemoteFunction") then
+
+                        HookRemoteInstance(
+                            descendant
+                        )
+                    end
+                end
+            )
+
+        TrackConnection(connection)
+    end)
+end
+
+local function Cleanup()
+    for _, connection in ipairs(
+        State.Connections
+    ) do
+        if connection
+            and typeof(connection)
+            == "RBXScriptConnection" then
+
+            pcall(function()
+                connection:Disconnect()
+            end)
+        end
+    end
+
+    table.clear(
+        State.Connections
+    )
+
+    table.clear(
+        State.History
+    )
+
+    table.clear(
+        State.MonitoredRemotes
+    )
+
+    table.clear(
+        State.CallCounters
+    )
+
+    table.clear(
+        HookState.WrappedInvoke
+    )
+
+    for _, entries in pairs(
+        State.TabEntries
+    ) do
+        table.clear(entries)
+    end
+end
+
+ScreenGui.Destroying:Connect(
+    Cleanup
+)
+
+local HookInstalled =
+    InstallNamecallMonitor()
+
+ScanAndObserve(
+    ReplicatedStorage
+)
+
+pcall(function()
+    ScanAndObserve(
+        game:GetService("JointsService")
+    )
 end)
+
+pcall(function()
+    if Players.LocalPlayer then
+        ScanAndObserve(
+            Players.LocalPlayer
+        )
+    end
+end)
+
+local StatusNotice = Instance.new("TextLabel")
+StatusNotice.Name = "StatusNotice"
+StatusNotice.Size = UDim2.new(1, -8, 0, 44)
+StatusNotice.BackgroundColor3 =
+    HookInstalled
+    and Color3.fromRGB(25, 55, 38)
+    or Color3.fromRGB(60, 45, 20)
+StatusNotice.TextColor3 =
+    HookInstalled
+    and Color3.fromRGB(120, 220, 155)
+    or Color3.fromRGB(240, 200, 100)
+StatusNotice.Font = Enum.Font.GothamMedium
+StatusNotice.TextSize = 10
+StatusNotice.TextWrapped = true
+StatusNotice.Text =
+    HookInstalled
+    and "Monitor active • FireServer / InvokeServer + incoming remotes"
+    or "Outgoing monitor unavailable • OnClientEvent / OnClientInvoke observer active"
+StatusNotice.Parent = SettingsScroll
+
+local StatusCorner = Instance.new("UICorner")
+StatusCorner.CornerRadius = UDim.new(0, 6)
+StatusCorner.Parent = StatusNotice
+
+SwitchTab("ALL")
+AnimateWindowOpen()
