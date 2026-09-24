@@ -242,8 +242,8 @@ UI.ScreenGui = ScreenGui
 
 -- Mobile detection
 State.IsMobile = DetectMobile()
-local WIN_W = State.IsMobile and 300 or 440
-local WIN_H = State.IsMobile and 380 or 320
+local WIN_W = State.IsMobile and 340 or 500
+local WIN_H = State.IsMobile and 520 or 380
 
 -- Floating reopen button
 local FloatingBtn = Instance.new("TextButton")
@@ -448,7 +448,7 @@ do local c = Instance.new("UICorner"); c.CornerRadius = UDim.new(0,5); c.Parent 
 
 local DetailScroll = Instance.new("ScrollingFrame")
 DetailScroll.Name = "DetailScroll"
-DetailScroll.Size = UDim2.new(1, -10, 1, -168)
+DetailScroll.Size = UDim2.new(1, -10, 1, -200)
 DetailScroll.Position = UDim2.new(0, 5, 0, 50)
 DetailScroll.BackgroundTransparency = 1
 DetailScroll.BorderSizePixel = 0
@@ -479,8 +479,8 @@ UI.DetailText = DetailText
 
 local ArgsEditorFrame = Instance.new("Frame")
 ArgsEditorFrame.Name = "ArgsEditorFrame"
-ArgsEditorFrame.Size = UDim2.new(1, -10, 0, 116)
-ArgsEditorFrame.Position = UDim2.new(0, 5, 1, -160)
+ArgsEditorFrame.Size = UDim2.new(1, -10, 0, 110)
+ArgsEditorFrame.Position = UDim2.new(0, 5, 1, -156)
 ArgsEditorFrame.BackgroundColor3 = Color3.fromRGB(20, 22, 29)
 ArgsEditorFrame.BorderSizePixel = 0
 ArgsEditorFrame.Parent = DetailPanel
@@ -497,7 +497,7 @@ ArgsEditorLabel.Font = Enum.Font.GothamBold
 ArgsEditorLabel.TextSize = 9
 ArgsEditorLabel.TextColor3 = Color3.fromRGB(130, 135, 155)
 ArgsEditorLabel.TextXAlignment = Enum.TextXAlignment.Left
-ArgsEditorLabel.Text = "ARGS EDITOR  •  ketik args, pisah koma"
+ArgsEditorLabel.Text = "ARGS EDITOR  •  pisah koma"
 ArgsEditorLabel.Parent = ArgsEditorFrame
 
 -- TextBox multi-line untuk edit args
@@ -508,7 +508,7 @@ ArgsInput.Position = UDim2.new(0, 5, 0, 22)
 ArgsInput.BackgroundColor3 = Color3.fromRGB(16, 17, 22)
 ArgsInput.TextColor3 = Color3.fromRGB(230, 235, 245)
 ArgsInput.PlaceholderColor3 = Color3.fromRGB(90, 95, 115)
-ArgsInput.PlaceholderText = 'contoh: "hello", 123, true, Vector3.new(0,0,0)'
+ArgsInput.PlaceholderText = '"hello", 123, true'
 ArgsInput.Font = Enum.Font.Code
 ArgsInput.TextSize = 10
 ArgsInput.ClearTextOnFocus = false
@@ -528,39 +528,64 @@ end
 UI.ArgsInput = ArgsInput
 
 -- ============================================================
--- TOMBOL AKSI
+-- TOMBOL AKSI (2 baris: row 1 = COPY NAME + COPY PATH + COPY CODE, row 2 = EXEC full width)
 -- ============================================================
 
-local ActionBtnFrame = Instance.new("Frame")
-ActionBtnFrame.Size = UDim2.new(1, -10, 0, 30)
-ActionBtnFrame.Position = UDim2.new(0, 5, 1, -40)
-ActionBtnFrame.BackgroundTransparency = 1
-ActionBtnFrame.Parent = DetailPanel
+-- Baris atas: 3 tombol copy
+local CopyBtnFrame = Instance.new("Frame")
+CopyBtnFrame.Size = UDim2.new(1, -10, 0, 28)
+CopyBtnFrame.Position = UDim2.new(0, 5, 1, -84)
+CopyBtnFrame.BackgroundTransparency = 1
+CopyBtnFrame.Parent = DetailPanel
 
-local ActionLayout = Instance.new("UIListLayout")
-ActionLayout.FillDirection = Enum.FillDirection.Horizontal
-ActionLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-ActionLayout.Padding = UDim.new(0, 4)
-ActionLayout.Parent = ActionBtnFrame
+local CopyLayout = Instance.new("UIListLayout")
+CopyLayout.FillDirection = Enum.FillDirection.Horizontal
+CopyLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+CopyLayout.Padding = UDim.new(0, 4)
+CopyLayout.Parent = CopyBtnFrame
 
-local function CreateActionBtn(text, color)
+local function CreateCopyBtn(text)
     local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(0, 58, 1, 0)
-    btn.BackgroundColor3 = color or Color3.fromRGB(38, 41, 53)
+    btn.Size = UDim2.new(0.33, -4, 1, 0)
+    btn.BackgroundColor3 = Color3.fromRGB(38, 41, 53)
     btn.TextColor3 = Color3.fromRGB(210, 215, 230)
     btn.Font = Enum.Font.GothamBold
     btn.TextSize = 8
     btn.Text = text
     btn.AutoButtonColor = false
-    btn.Parent = ActionBtnFrame
+    btn.Parent = CopyBtnFrame
     local c = Instance.new("UICorner"); c.CornerRadius = UDim.new(0,5); c.Parent = btn
     return btn
 end
 
-local CopyNameBtn = CreateActionBtn("COPY NAME")
-local CopyPathBtn = CreateActionBtn("COPY PATH")
-local CopyReqBtn  = CreateActionBtn("COPY CODE")
-local ExecuteBtn  = CreateActionBtn("▶ EXEC", Color3.fromRGB(30, 100, 50))
+local CopyNameBtn = CreateCopyBtn("COPY NAME")
+local CopyPathBtn = CreateCopyBtn("COPY PATH")
+local CopyReqBtn  = CreateCopyBtn("COPY CODE")
+
+-- Baris bawah: tombol EXEC full width
+local ExecBtnFrame = Instance.new("Frame")
+ExecBtnFrame.Size = UDim2.new(1, -10, 0, 36)
+ExecBtnFrame.Position = UDim2.new(0, 5, 1, -48)
+ExecBtnFrame.BackgroundTransparency = 1
+ExecBtnFrame.Parent = DetailPanel
+
+local ExecuteBtn = Instance.new("TextButton")
+ExecuteBtn.Size = UDim2.new(1, 0, 1, 0)
+ExecuteBtn.BackgroundColor3 = Color3.fromRGB(30, 110, 55)
+ExecuteBtn.TextColor3 = Color3.fromRGB(220, 255, 230)
+ExecuteBtn.Font = Enum.Font.GothamBold
+ExecuteBtn.TextSize = 11
+ExecuteBtn.Text = "▶  EXECUTE"
+ExecuteBtn.AutoButtonColor = false
+ExecuteBtn.Parent = ExecBtnFrame
+do
+    local c = Instance.new("UICorner"); c.CornerRadius = UDim.new(0,7); c.Parent = ExecuteBtn
+    local s = Instance.new("UIStroke"); s.Color = Color3.fromRGB(60, 180, 90); s.Thickness = 1; s.Transparency = 0.4; s.Parent = ExecuteBtn
+end
+
+-- Dummy ActionBtnFrame untuk kompatibilitas FlashBtn
+local ActionBtnFrame = ExecBtnFrame
+
 UI.CopyNameBtn = CopyNameBtn
 UI.CopyPathBtn = CopyPathBtn
 UI.CopyReqBtn  = CopyReqBtn
@@ -568,13 +593,14 @@ UI.ExecuteBtn  = ExecuteBtn
 
 local function FlashBtn(btn, success)
     local original = btn.Text
-    btn.Text = success and "COPIED!" or "UNAVAIL"
+    local origColor = btn.BackgroundColor3
+    btn.Text = success and "✓ OK" or "✗ FAIL"
     local col = success and Color3.fromRGB(40,130,70) or Color3.fromRGB(120,45,45)
     btn.BackgroundColor3 = col
     task.delay(1.1, function()
         if btn and btn.Parent then
             btn.Text = original
-            btn.BackgroundColor3 = Color3.fromRGB(38, 41, 53)
+            btn.BackgroundColor3 = origColor
         end
     end)
 end
@@ -1344,6 +1370,63 @@ local function SafeRecord(instance, classType, args, returnValue)
 end
 
 -- ============================================================
+-- BLACKLIST: remote sistem Roblox bukan milik game
+-- ============================================================
+
+-- Path segment yang pasti sistem Roblox / engine, bukan game
+local PATH_BLACKLIST = {
+    "UserGenerated",
+    "ABTests",
+    "Analytics",
+    "RobloxGui",
+    "CoreGui",
+    "CoreScriptLocalization",
+    "RobloxReplicatedStorage",
+    "LocalizationService",
+    "MarketplaceService",
+    "TeleportService",
+    "SocialService",
+    "VoiceChatService",
+    "AvatarEditorService",
+    "AvatarCreationService",
+    "PolicyService",
+    "ExperienceNotificationService",
+    "BrowserService",
+    "HttpRbxApiService",
+    "LoadingScript",
+    "PointsService",
+    "BadgeService",
+    "DataStoreService",
+    "Shared",            -- ReplicatedStorage.UserGenerated.ABTests.Shared dll
+}
+
+-- Nama remote yang jelas sistem
+local NAME_BLACKLIST = {
+    "FireClientSignal",
+    "RecordEvent",
+    "RecordSuperProperty",
+    "SendAnalyticsData",
+    "LogEngineEvent",
+}
+
+local function IsSystemRemote(instance)
+    local ok, path = pcall(function() return instance:GetFullName() end)
+    if not ok then return false end
+    -- Cek tiap segment path
+    for seg in string.gmatch(path, "[^%.]+") do
+        for _, bl in ipairs(PATH_BLACKLIST) do
+            if seg == bl then return true end
+        end
+    end
+    -- Cek nama instance
+    local name = instance.Name
+    for _, bl in ipairs(NAME_BLACKLIST) do
+        if name == bl then return true end
+    end
+    return false
+end
+
+-- ============================================================
 -- HOOK REMOTE INSTANCE
 -- ============================================================
 
@@ -1355,6 +1438,11 @@ local function RegisterRemoteDetected(instance)
         end
     end)
     if not ok1 then return end
+
+    -- Filter sistem Roblox
+    local isSystem = false
+    pcall(function() isSystem = IsSystemRemote(instance) end)
+    if isSystem then return end
 
     local path = GetFullPath(instance)
     if RemoteRegistry[path] then return end
@@ -1391,6 +1479,11 @@ local function HookRemoteInstance(instance)
         isRemote = instance:IsA("RemoteEvent") or instance:IsA("RemoteFunction")
     end)
     if not isRemote then return end
+
+    -- Skip remote sistem Roblox
+    local isSystem = false
+    pcall(function() isSystem = IsSystemRemote(instance) end)
+    if isSystem then return end
 
     HookedInstances[instance] = true
 
