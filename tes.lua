@@ -51,6 +51,10 @@ local HookState = {
     WrappedInvoke = {},
 }
 
+-- Throttle: last UI-update time per remote path
+local RecordThrottle = {}
+local RECORD_THROTTLE_INTERVAL = 0.2  -- detik; kurangi kalau mau lebih responsif
+
 local UI = {
     ScreenGui = nil,
     MainWindow = nil,
@@ -854,8 +858,8 @@ local function UpdateDetailPanel(path)
     local fullText = table.concat(lines, "")
     UI.DetailText.Text = fullText
 
-    -- Auto-isi ArgsInput dari LastArgs (hanya jika user belum edit manual)
-    if UI.ArgsInput then
+    -- Auto-isi ArgsInput dari LastArgs HANYA jika user tidak sedang fokus ngetik
+    if UI.ArgsInput and not UI.ArgsInput:IsFocused() then
         local function LuaReprSimple(v)
             local t = typeof(v)
             if t == "string" then return string.format("%q", v)
@@ -1342,23 +1346,37 @@ local function RecordActivity(instance, classType, args, returnValue)
     reg.LastReturn = returnValue
     reg.Status = "ACTIVE"
 
-    UpdateCardForPath(path)
-
-    -- History
-    local histEntry = {
-        Name = reg.Name,
-        Class = classType,
-        Path = path,
-        Timestamp = reg.LastTimestamp,
-        Args = args or {},
-        ReturnValue = returnValue,
-    }
-    table.insert(State.History, histEntry)
-    if #State.History > Settings.MaxHistory then
-        table.remove(State.History, 1)
+    -- Throttle UI update per remote — cegah spam update setiap frame
+    local now = os.clock()
+    local lastUpdate = RecordThrottle[path] or 0
+    local shouldUpdateUI = (now - lastUpdate) >= RECORD_THROTTLE_INTERVAL
+    if shouldUpdateUI then
+        RecordThrottle[path] = now
+        UpdateCardForPath(path)
     end
 
-    AddHistoryCard(histEntry)
+    -- History: throttle juga, jangan tambah entry setiap fire kalau sama persis
+    local lastHist = State.History[#State.History]
+    local isDuplicate = lastHist
+        and lastHist.Path == path
+        and not shouldUpdateUI  -- kalau masih dalam throttle window, skip history juga
+
+    if not isDuplicate then
+        local histEntry = {
+            Name = reg.Name,
+            Class = classType,
+            Path = path,
+            Timestamp = reg.LastTimestamp,
+            Args = args or {},
+            ReturnValue = returnValue,
+        }
+        table.insert(State.History, histEntry)
+        if #State.History > Settings.MaxHistory then
+            table.remove(State.History, 1)
+        end
+        AddHistoryCard(histEntry)
+    end
+
     UpdateStatusBar()
 end
 
@@ -1771,7 +1789,12 @@ CopyReqBtn.MouseButton1Click:Connect(function()
 end)
 
 -- Execute: fire/invoke pakai isi ArgsInput (bisa diedit manual)
+local _execCooldown = false
 ExecuteBtn.MouseButton1Click:Connect(function()
+    if _execCooldown then return end
+    _execCooldown = true
+    task.delay(0.5, function() _execCooldown = false end)
+
     local reg = State.SelectedPath and RemoteRegistry[State.SelectedPath]
     if not reg then FlashBtn(ExecuteBtn, false) return end
 
