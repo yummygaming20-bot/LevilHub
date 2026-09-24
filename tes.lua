@@ -448,7 +448,7 @@ do local c = Instance.new("UICorner"); c.CornerRadius = UDim.new(0,5); c.Parent 
 
 local DetailScroll = Instance.new("ScrollingFrame")
 DetailScroll.Name = "DetailScroll"
-DetailScroll.Size = UDim2.new(1, -10, 1, -100)
+DetailScroll.Size = UDim2.new(1, -10, 1, -168)
 DetailScroll.Position = UDim2.new(0, 5, 0, 50)
 DetailScroll.BackgroundTransparency = 1
 DetailScroll.BorderSizePixel = 0
@@ -473,10 +473,67 @@ DetailText.Text = "Select a remote from the list."
 DetailText.Parent = DetailScroll
 UI.DetailText = DetailText
 
--- Copy buttons at bottom of detail
+-- ============================================================
+-- ARGS EDITOR (input field editable di atas tombol)
+-- ============================================================
+
+local ArgsEditorFrame = Instance.new("Frame")
+ArgsEditorFrame.Name = "ArgsEditorFrame"
+ArgsEditorFrame.Size = UDim2.new(1, -10, 0, 116)
+ArgsEditorFrame.Position = UDim2.new(0, 5, 1, -160)
+ArgsEditorFrame.BackgroundColor3 = Color3.fromRGB(20, 22, 29)
+ArgsEditorFrame.BorderSizePixel = 0
+ArgsEditorFrame.Parent = DetailPanel
+do
+    local c = Instance.new("UICorner"); c.CornerRadius = UDim.new(0,7); c.Parent = ArgsEditorFrame
+    local s = Instance.new("UIStroke"); s.Color = Color3.fromRGB(55,59,73); s.Thickness = 1; s.Transparency = 0.5; s.Parent = ArgsEditorFrame
+end
+
+local ArgsEditorLabel = Instance.new("TextLabel")
+ArgsEditorLabel.Size = UDim2.new(1, -10, 0, 16)
+ArgsEditorLabel.Position = UDim2.new(0, 8, 0, 4)
+ArgsEditorLabel.BackgroundTransparency = 1
+ArgsEditorLabel.Font = Enum.Font.GothamBold
+ArgsEditorLabel.TextSize = 9
+ArgsEditorLabel.TextColor3 = Color3.fromRGB(130, 135, 155)
+ArgsEditorLabel.TextXAlignment = Enum.TextXAlignment.Left
+ArgsEditorLabel.Text = "ARGS EDITOR  •  ketik args, pisah koma"
+ArgsEditorLabel.Parent = ArgsEditorFrame
+
+-- TextBox multi-line untuk edit args
+local ArgsInput = Instance.new("TextBox")
+ArgsInput.Name = "ArgsInput"
+ArgsInput.Size = UDim2.new(1, -10, 1, -24)
+ArgsInput.Position = UDim2.new(0, 5, 0, 22)
+ArgsInput.BackgroundColor3 = Color3.fromRGB(16, 17, 22)
+ArgsInput.TextColor3 = Color3.fromRGB(230, 235, 245)
+ArgsInput.PlaceholderColor3 = Color3.fromRGB(90, 95, 115)
+ArgsInput.PlaceholderText = 'contoh: "hello", 123, true, Vector3.new(0,0,0)'
+ArgsInput.Font = Enum.Font.Code
+ArgsInput.TextSize = 10
+ArgsInput.ClearTextOnFocus = false
+ArgsInput.MultiLine = true
+ArgsInput.TextXAlignment = Enum.TextXAlignment.Left
+ArgsInput.TextYAlignment = Enum.TextYAlignment.Top
+ArgsInput.TextWrapped = true
+ArgsInput.Text = ""
+ArgsInput.Parent = ArgsEditorFrame
+do
+    local c = Instance.new("UICorner"); c.CornerRadius = UDim.new(0,5); c.Parent = ArgsInput
+    local p = Instance.new("UIPadding")
+    p.PaddingLeft = UDim.new(0,6); p.PaddingRight = UDim.new(0,6)
+    p.PaddingTop = UDim.new(0,4); p.PaddingBottom = UDim.new(0,4)
+    p.Parent = ArgsInput
+end
+UI.ArgsInput = ArgsInput
+
+-- ============================================================
+-- TOMBOL AKSI
+-- ============================================================
+
 local ActionBtnFrame = Instance.new("Frame")
 ActionBtnFrame.Size = UDim2.new(1, -10, 0, 30)
-ActionBtnFrame.Position = UDim2.new(0, 5, 1, -38)
+ActionBtnFrame.Position = UDim2.new(0, 5, 1, -40)
 ActionBtnFrame.BackgroundTransparency = 1
 ActionBtnFrame.Parent = DetailPanel
 
@@ -486,13 +543,13 @@ ActionLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 ActionLayout.Padding = UDim.new(0, 4)
 ActionLayout.Parent = ActionBtnFrame
 
-local function CreateActionBtn(text)
+local function CreateActionBtn(text, color)
     local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(0, 70, 1, 0)
-    btn.BackgroundColor3 = Color3.fromRGB(38, 41, 53)
+    btn.Size = UDim2.new(0, 58, 1, 0)
+    btn.BackgroundColor3 = color or Color3.fromRGB(38, 41, 53)
     btn.TextColor3 = Color3.fromRGB(210, 215, 230)
     btn.Font = Enum.Font.GothamBold
-    btn.TextSize = 9
+    btn.TextSize = 8
     btn.Text = text
     btn.AutoButtonColor = false
     btn.Parent = ActionBtnFrame
@@ -502,10 +559,12 @@ end
 
 local CopyNameBtn = CreateActionBtn("COPY NAME")
 local CopyPathBtn = CreateActionBtn("COPY PATH")
-local CopyReqBtn  = CreateActionBtn("COPY ARGS")
+local CopyReqBtn  = CreateActionBtn("COPY CODE")
+local ExecuteBtn  = CreateActionBtn("▶ EXEC", Color3.fromRGB(30, 100, 50))
 UI.CopyNameBtn = CopyNameBtn
 UI.CopyPathBtn = CopyPathBtn
 UI.CopyReqBtn  = CopyReqBtn
+UI.ExecuteBtn  = ExecuteBtn
 
 local function FlashBtn(btn, success)
     local original = btn.Text
@@ -768,6 +827,36 @@ local function UpdateDetailPanel(path)
 
     local fullText = table.concat(lines, "")
     UI.DetailText.Text = fullText
+
+    -- Auto-isi ArgsInput dari LastArgs (hanya jika user belum edit manual)
+    if UI.ArgsInput then
+        local function LuaReprSimple(v)
+            local t = typeof(v)
+            if t == "string" then return string.format("%q", v)
+            elseif t == "number" then return tostring(v)
+            elseif t == "boolean" then return tostring(v)
+            elseif t == "Vector3" then return string.format("Vector3.new(%g,%g,%g)", v.X, v.Y, v.Z)
+            elseif t == "Vector2" then return string.format("Vector2.new(%g,%g)", v.X, v.Y)
+            elseif t == "CFrame" then local p = v.Position; return string.format("CFrame.new(%g,%g,%g)", p.X, p.Y, p.Z)
+            elseif t == "Color3" then return string.format("Color3.fromRGB(%d,%d,%d)", math.floor(v.R*255+0.5), math.floor(v.G*255+0.5), math.floor(v.B*255+0.5))
+            elseif t == "table" then
+                local parts = {}
+                for k, val in pairs(v) do
+                    if type(k) == "number" then table.insert(parts, LuaReprSimple(val))
+                    else table.insert(parts, string.format("[%q]=%s", tostring(k), LuaReprSimple(val))) end
+                end
+                return "{" .. table.concat(parts, ", ") .. "}"
+            else return "nil" end
+        end
+        local args = reg.LastArgs or {}
+        if #args > 0 then
+            local parts = {}
+            for _, v in ipairs(args) do table.insert(parts, LuaReprSimple(v)) end
+            UI.ArgsInput.Text = table.concat(parts, ", ")
+        else
+            UI.ArgsInput.Text = ""
+        end
+    end
 
     task.defer(function()
         if not UI.DetailScroll or not UI.DetailScroll.Parent then return end
@@ -1508,10 +1597,148 @@ CopyPathBtn.MouseButton1Click:Connect(function()
     else FlashBtn(CopyPathBtn, false) end
 end)
 
+-- ============================================================
+-- PARSE ARGS INPUT → table of values (via loadstring sandbox)
+-- ============================================================
+
+local function ParseArgsInput(inputText)
+    -- Wrap teks jadi return statement lalu eval
+    local src = "return " .. (inputText or "")
+    local fn, err = loadstring(src)
+    if not fn then
+        -- Coba wrap lagi kalau kosong
+        if inputText == nil or inputText:match("^%s*$") then
+            return {}, true
+        end
+        return {}, false, err
+    end
+    local ok, result = pcall(fn)
+    if not ok then return {}, false, result end
+    -- result bisa multi-value hanya dari return, kumpulkan jadi table
+    if type(result) == "table" and result[1] == nil and next(result) == nil then
+        -- return kosong atau {}
+        return {}, true
+    end
+    -- Bungkus dalam table.pack untuk tangkap multi-return
+    local fnPack, _ = loadstring("return table.pack(" .. (inputText or "") .. ")")
+    if fnPack then
+        local ok2, packed = pcall(fnPack)
+        if ok2 and type(packed) == "table" then
+            local out = {}
+            for i = 1, (packed.n or 0) do out[i] = packed[i] end
+            return out, true
+        end
+    end
+    return {result}, true
+end
+
+-- Bangun remoteRef string dari path
+local function BuildRemoteRef(reg)
+    local pathStr = reg.Path or ""
+    local parts = {}
+    for seg in string.gmatch(pathStr, "[^%.]+") do table.insert(parts, seg) end
+    if #parts >= 2 then
+        local root = parts[1]
+        local accessor
+        if root == "ReplicatedStorage" then accessor = 'game:GetService("ReplicatedStorage")'
+        elseif root == "Workspace" or root == "workspace" then accessor = 'game:GetService("Workspace")'
+        elseif root == "Lighting" then accessor = 'game:GetService("Lighting")'
+        else accessor = string.format('game:GetService("%s")', root) end
+        local chain = accessor
+        for i = 2, #parts do chain = chain .. string.format(':WaitForChild("%s")', parts[i]) end
+        return chain
+    end
+    return string.format('game:GetService("ReplicatedStorage"):WaitForChild("%s")', reg.Name)
+end
+
+-- Generate Lua code dari isi ArgsInput
+local function BuildExecCode(reg)
+    if not reg then return nil end
+    local argStr = (UI.ArgsInput and UI.ArgsInput.Text ~= "") and UI.ArgsInput.Text or ""
+    local remoteRef = BuildRemoteRef(reg)
+    local code
+    if reg.Class == "RemoteEvent" then
+        code = string.format('local remote = %s\nremote:FireServer(%s)', remoteRef, argStr)
+    elseif reg.Class == "RemoteFunction" then
+        code = string.format('local remote = %s\nlocal result = remote:InvokeServer(%s)\nprint("Result:", result)', remoteRef, argStr)
+    else
+        code = "-- Unknown class: " .. tostring(reg.Class)
+    end
+    return code
+end
+
 CopyReqBtn.MouseButton1Click:Connect(function()
     local reg = State.SelectedPath and RemoteRegistry[State.SelectedPath]
-    if reg then FlashBtn(CopyReqBtn, SafeSetClipboard(FormatArgsList(reg.LastArgs or {})))
-    else FlashBtn(CopyReqBtn, false) end
+    if reg then
+        local code = BuildExecCode(reg)
+        FlashBtn(CopyReqBtn, SafeSetClipboard(code or ""))
+    else
+        FlashBtn(CopyReqBtn, false)
+    end
+end)
+
+-- Execute: fire/invoke pakai isi ArgsInput (bisa diedit manual)
+ExecuteBtn.MouseButton1Click:Connect(function()
+    local reg = State.SelectedPath and RemoteRegistry[State.SelectedPath]
+    if not reg then FlashBtn(ExecuteBtn, false) return end
+
+    -- Parse args dari input box
+    local inputText = UI.ArgsInput and UI.ArgsInput.Text or ""
+    local args, ok, parseErr = ParseArgsInput(inputText)
+    if not ok then
+        -- Tunjukkan error di label args editor sebentar
+        if UI.ArgsInput then
+            local prev = UI.ArgsInput.PlaceholderText
+            UI.ArgsInput.PlaceholderText = "PARSE ERROR: " .. tostring(parseErr)
+            task.delay(2, function() if UI.ArgsInput and UI.ArgsInput.Parent then UI.ArgsInput.PlaceholderText = prev end end)
+        end
+        FlashBtn(ExecuteBtn, false)
+        return
+    end
+
+    -- Cari instance
+    local instance = reg.Instance
+    if not instance or IsDestroyed(instance) then
+        pcall(function()
+            local parts = {}
+            for seg in string.gmatch(reg.Path, "[^%.]+") do table.insert(parts, seg) end
+            if #parts < 2 then return end
+            local root = parts[1]
+            local svc
+            pcall(function() svc = game:GetService(root) end)
+            if not svc then svc = game[root] end
+            local cur = svc
+            for i = 2, #parts do
+                cur = cur:WaitForChild(parts[i], 3)
+                if not cur then return end
+            end
+            instance = cur
+        end)
+    end
+
+    if not instance or IsDestroyed(instance) then
+        FlashBtn(ExecuteBtn, false)
+        return
+    end
+
+    if reg.Class == "RemoteEvent" then
+        local execOk = pcall(function()
+            instance:FireServer(table.unpack(args))
+        end)
+        FlashBtn(ExecuteBtn, execOk)
+    elseif reg.Class == "RemoteFunction" then
+        local execOk, result = pcall(function()
+            return instance:InvokeServer(table.unpack(args))
+        end)
+        if execOk then
+            reg.LastReturn = result
+            -- Jangan auto-refresh ArgsInput (user mungkin lagi edit)
+            local savedText = UI.ArgsInput and UI.ArgsInput.Text
+            UpdateDetailPanel(reg.Path)
+            if UI.ArgsInput and savedText then UI.ArgsInput.Text = savedText end
+        end
+        FlashBtn(ExecuteBtn, execOk)
+    end
 end)
 
 -- ============================================================
@@ -1746,7 +1973,7 @@ ScreenGui.Destroying:Connect(Cleanup)
 -- Hook namecall first
 local hookInstalled = InstallNamecallMonitor()
 
--- Scan containers
+-- Scan containers game (bukan sistem Roblox / Players)
 ScanContainer(ReplicatedStorage)
 
 pcall(function()
@@ -1754,8 +1981,30 @@ pcall(function()
 end)
 
 pcall(function()
-    if Players.LocalPlayer then
-        ScanContainer(Players.LocalPlayer)
+    ScanContainer(workspace)
+end)
+
+-- Scan semua Players untuk RemoteEvent/Function milik game (character, dll)
+-- tapi BUKAN LocalPlayer.PlayerGui / CoreGui (sistem Roblox)
+pcall(function()
+    for _, player in ipairs(Players:GetPlayers()) do
+        -- Hanya scan Character (milik game), bukan PlayerGui
+        if player.Character then
+            ScanContainer(player.Character)
+        end
+    end
+    -- Pantau karakter yang spawn setelahnya
+    Players.PlayerAdded:Connect(function(player)
+        player.CharacterAdded:Connect(function(char)
+            ScanContainer(char)
+        end)
+    end)
+    local lp = Players.LocalPlayer
+    if lp then
+        lp.CharacterAdded:Connect(function(char)
+            ScanContainer(char)
+        end)
+        if lp.Character then ScanContainer(lp.Character) end
     end
 end)
 
