@@ -267,7 +267,7 @@ local function Init(HUB)
     -- Player Tab dari main
 
     -- Movement
-    local MoveSub = Tab:AddSubTab("Movement")
+    local MoveSub = Tab:AddSection("Movement")
     HUB.UI.MoveSub = MoveSub
 
     MoveSub:AddToggle({
@@ -332,7 +332,7 @@ local function Init(HUB)
     })
 
     -- Area Travel
-    local AreaTpSub = Tab:AddSubTab("Area Travel")
+    local AreaTpSub = Tab:AddSection("Area Travel")
     local selectedAreaTp = "Base / Plot"
 
     AreaTpSub:AddDropdown({
@@ -350,7 +350,7 @@ local function Init(HUB)
     })
 
     -- Plot Travel
-    local PlotSub = Tab:AddSubTab("Plot Travel")
+    local PlotSub = Tab:AddSection("Plot Travel")
 
     PlotSub:AddButton({
         Name = "My Plot", Primary = true,
@@ -369,7 +369,7 @@ local function Init(HUB)
     })
 
     -- Player Travel
-    local PlayerSub = Tab:AddSubTab("Player Travel")
+    local PlayerSub = Tab:AddSection("Player Travel")
     local selectedPlayer = nil
     local playerNames    = {}
 
@@ -410,7 +410,7 @@ local function Init(HUB)
     })
 
     -- Visuals
-    local VisSub = Tab:AddSubTab("Visuals & Performance")
+    local VisSub = Tab:AddSection("Visuals & Performance")
     VisSub:AddToggle({
         Name = "Fullbright (Daylight Visuals)", Default = false, Flag = "fullbright",
         Callback = safeCallback(function(v)

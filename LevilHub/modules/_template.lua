@@ -14,7 +14,7 @@ local function Init(HUB)
     -- ============================================================
     -- TAMBAH SUBTAB DI DALAM TAB
     -- ============================================================
-    local Section = Tab:AddSubTab("Nama SubTab")
+    local Section = Tab:AddSection("Nama SubTab")
 
     -- ============================================================
     -- STATE

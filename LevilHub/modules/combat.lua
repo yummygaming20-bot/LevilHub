@@ -154,7 +154,7 @@ local function Init(HUB)
     -- Combat Tab dari main
 
     -- Bat & Slap Aura
-    local BatSub = Tab:AddSubTab("Bat & Slap Aura")
+    local BatSub = Tab:AddSection("Bat & Slap Aura")
     HUB.UI.BatSub = BatSub
 
     BatSub:AddToggle({
@@ -184,7 +184,7 @@ local function Init(HUB)
     })
 
     -- Defense & Guards
-    local GuardSub = Tab:AddSubTab("Defense & Guards")
+    local GuardSub = Tab:AddSection("Defense & Guards")
     HUB.UI.GuardSub = GuardSub
 
     GuardSub:AddToggle({

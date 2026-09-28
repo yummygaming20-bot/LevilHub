@@ -187,7 +187,7 @@ local function Init(HUB)
     HUB.UI.BaseTab = Tab
 
     -- Homestead & Treadmill
-    local UpgradesSub = Tab:AddSubTab("Homestead & Treadmill")
+    local UpgradesSub = Tab:AddSection("Homestead & Treadmill")
     HUB.UI.UpgradesSub = UpgradesSub
 
     UpgradesSub:AddToggle({
@@ -218,7 +218,7 @@ local function Init(HUB)
     })
 
     -- Pets & Satchel
-    local PetsSub = Tab:AddSubTab("Pets & Satchel")
+    local PetsSub = Tab:AddSection("Pets & Satchel")
     HUB.UI.PetsSub = PetsSub
 
     PetsSub:AddToggle({
@@ -234,7 +234,7 @@ local function Init(HUB)
     })
 
     -- Auto Sell
-    local SalesSub = Tab:AddSubTab("Auto Sell")
+    local SalesSub = Tab:AddSection("Auto Sell")
     HUB.UI.SalesSub = SalesSub
 
     SalesSub:AddToggle({
@@ -269,7 +269,7 @@ local function Init(HUB)
     })
 
     -- Claim Rewards
-    local RewardsSub = Tab:AddSubTab("Claim Rewards")
+    local RewardsSub = Tab:AddSection("Claim Rewards")
     HUB.UI.RewardsSub = RewardsSub
 
     RewardsSub:AddToggle({

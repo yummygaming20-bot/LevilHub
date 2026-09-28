@@ -123,7 +123,7 @@ local function Init(HUB)
     local Tab = HUB.UI.Tabs["Settings"]
     HUB.UI.SettingsTab = Tab
 
-    local CfgSub = Tab:AddSubTab("Configuration")
+    local CfgSub = Tab:AddSection("Configuration")
 
     CfgSub:AddToggle({
         Name = "Auto Save Config", Default = true, Flag = "settings_autosave",
@@ -162,7 +162,7 @@ local function Init(HUB)
     })
 
     -- Unloader
-    local UnloadSub = Tab:AddSubTab("Unload")
+    local UnloadSub = Tab:AddSection("Unload")
 
     UnloadSub:AddButton({
         Name = "Unload LevilHub", Primary = true,

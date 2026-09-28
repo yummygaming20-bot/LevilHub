@@ -321,8 +321,8 @@ local function Init(HUB)
     -- ============================================================
     -- UI — Sub tabs di dalam tab "Auto"
     -- ============================================================
-    local StealSub = AutoTab:AddSubTab("Auto Steal")
-    local HatchSub = AutoTab:AddSubTab("Auto Hatch & Plant")
+    local StealSub = AutoTab:AddSection("Auto Steal")
+    local HatchSub = AutoTab:AddSection("Auto Hatch & Plant")
 
     -- Auto Steal SubTab
     StealSub:AddToggle({ Name="Auto Steal Eggs", Default=false, Flag="steal_auto",

@@ -319,7 +319,7 @@ local function Init(HUB)
     -- TAB UI
     -- ============================================================
     local Tab = HUB.UI.Tabs["ESP"]
-    local EspSub  = Tab:AddSubTab("Egg Tracker ESP")
+    local EspSub  = Tab:AddSection("Egg Tracker ESP")
     -- subtab ESP
 
     local safeC = safeCallback
