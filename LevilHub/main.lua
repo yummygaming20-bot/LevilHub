@@ -6,7 +6,7 @@ if not game then error("[LevilHub] Harus dijalankan di Roblox.") end
 -- ============================================================
 -- KONSTANTA
 -- ============================================================
-local BASE_URL       = "https://raw.githubusercontent.com/yummygaming20-bot/LevilHub/refs/heads/main/LevilHub/0"
+local BASE_URL       = "https://raw.githubusercontent.com/yummygaming20-bot/LevilHub/refs/heads/main/LevilHub/"
 local WindUI_VERSION = "1.6.66"
 
 -- Tab dibuat di main, dioper ke modul lewat HUB.Tabs
