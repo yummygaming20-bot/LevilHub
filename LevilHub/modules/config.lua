@@ -123,14 +123,14 @@ local function Init(HUB)
     local Tab = HUB.UI.Tabs["Settings"]
     HUB.UI.SettingsTab = Tab
 
-    local CfgSub = Tab:AddSection("Configuration")
+    Tab:AddSection("Configuration")
 
-    CfgSub:AddToggle({
+    Tab:AddToggle({
         Name = "Auto Save Config", Default = true, Flag = "settings_autosave",
         Callback = function(v) CFG.autoSave = v == true end
     })
 
-    CfgSub:AddButton({
+    Tab:AddButton({
         Name = "Save Config Now", Primary = true,
         Callback = safeCallback(function()
             local ok = cfgWrite()
@@ -138,7 +138,7 @@ local function Init(HUB)
         end)
     })
 
-    CfgSub:AddButton({
+    Tab:AddButton({
         Name = "Load Config",
         Callback = safeCallback(function()
             local saved = cfgRead()
@@ -152,7 +152,7 @@ local function Init(HUB)
         end)
     })
 
-    CfgSub:AddButton({
+    Tab:AddButton({
         Name = "Reset Config",
         Callback = safeCallback(function()
             CFG.data = {}
@@ -162,9 +162,9 @@ local function Init(HUB)
     })
 
     -- Unloader
-    local UnloadSub = Tab:AddSection("Unload")
+    Tab:AddSection("Unload")
 
-    UnloadSub:AddButton({
+    Tab:AddButton({
         Name = "Unload LevilHub", Primary = true,
         Callback = safeCallback(function()
             Notify("LevilHub", "Unloading...", "Info", 2)
@@ -176,7 +176,7 @@ local function Init(HUB)
         end)
     })
 
-    UnloadSub:AddToggle({
+    Tab:AddToggle({
         Name = "Auto Resume on Rejoin", Default = true, Flag = "settings_resume",
         Callback = safeCallback(function(v)
             -- Queue resume script di executor

@@ -321,31 +321,31 @@ local function Init(HUB)
     -- ============================================================
     -- UI — Sub tabs di dalam tab "Auto"
     -- ============================================================
-    local StealSub = AutoTab:AddSection("Auto Steal")
-    local HatchSub = AutoTab:AddSection("Auto Hatch & Plant")
+    AutoTab:AddSection("Auto Steal")
+    AutoTab:AddSection("Auto Hatch & Plant")
 
     -- Auto Steal SubTab
-    StealSub:AddToggle({ Name="Auto Steal Eggs", Default=false, Flag="steal_auto",
+    AutoTab:AddToggle({ Name="Auto Steal Eggs", Default=false, Flag="steal_auto",
         Callback=safeC(function(v) autoStealEnabled=v; Notify("Auto Steal",v and "Aktif" or "Nonaktif",v and "Success" or "Error") end) })
-    StealSub:AddToggle({ Name="Defend Egg", Default=false, Flag="phuc_defend_egg",
+    AutoTab:AddToggle({ Name="Defend Egg", Default=false, Flag="phuc_defend_egg",
         Callback=function(v) HUB.V44.defendEgg=v==true end })
-    StealSub:AddToggle({ Name="Only Eggs ≥ 100M Money/s", Default=false, Flag="phuc_100m",
+    AutoTab:AddToggle({ Name="Only Eggs ≥ 100M Money/s", Default=false, Flag="phuc_100m",
         Callback=function(v) HUB.V44.only100m=v==true end })
-    StealSub:AddToggle({ Name="Rare Egg Hunter (Highest Rarity First)", Default=true, Flag="rare_hunter",
+    AutoTab:AddToggle({ Name="Rare Egg Hunter (Highest Rarity First)", Default=true, Flag="rare_hunter",
         Callback=function(v) rareEggHunter=v end })
-    StealSub:AddToggle({ Name="Big Eggs Only", Default=false, Flag="big_eggs_only",
+    AutoTab:AddToggle({ Name="Big Eggs Only", Default=false, Flag="big_eggs_only",
         Callback=function(v) stealBigEggsOnly=v end })
-    StealSub:AddMultiDropdown({ Name="Filter Rarity", Options=RARITY_NAMES, Default={}, Flag="steal_rarities",
+    AutoTab:AddMultiDropdown({ Name="Filter Rarity", Options=RARITY_NAMES, Default={}, Flag="steal_rarities",
         Callback=function(v) selectedStealRarities=v end })
-    StealSub:AddMultiDropdown({ Name="Filter Area", Options=AREA_NAMES, Default={}, Flag="steal_areas",
+    AutoTab:AddMultiDropdown({ Name="Filter Area", Options=AREA_NAMES, Default={}, Flag="steal_areas",
         Callback=function(v) selectedStealAreas=v end })
-    StealSub:AddMultiDropdown({ Name="Filter Mutation", Options=MUTATION_FILTERS, Default={}, Flag="steal_muts",
+    AutoTab:AddMultiDropdown({ Name="Filter Mutation", Options=MUTATION_FILTERS, Default={}, Flag="steal_muts",
         Callback=function(v) selectedMutationTypes=v end })
-    StealSub:AddSlider({ Name="Glide Speed", Min=150, Max=850, Default=850, Suffix=" studs/s", Flag="glide_speed",
+    AutoTab:AddSlider({ Name="Glide Speed", Min=150, Max=850, Default=850, Suffix=" studs/s", Flag="glide_speed",
         Callback=function(v) glideSpeed=math.clamp(tonumber(v) or 850,150,850) end })
-    StealSub:AddSlider({ Name="Steal Delay Gap", Min=0.35, Max=10, Default=0.75, Suffix="s", Flag="steal_gap",
+    AutoTab:AddSlider({ Name="Steal Delay Gap", Min=0.35, Max=10, Default=0.75, Suffix="s", Flag="steal_gap",
         Callback=function(v) stealDelay=math.clamp(tonumber(v) or 0.75,0.35,10) end })
-    StealSub:AddButton({ Name="Steal Best Egg Once", Primary=true,
+    AutoTab:AddButton({ Name="Steal Best Egg Once", Primary=true,
         Callback=safeC(function()
             if stealBusy then Notify("Steal","Sedang busy","Info"); return end
             local eggs=GetMatchingFieldEggs()
@@ -355,18 +355,18 @@ local function Init(HUB)
         end) })
 
     -- Auto Hatch & Plant SubTab
-    HatchSub:AddToggle({ Name="Auto Hatch Ready Eggs", Default=false, Flag="hatch_auto",
+    AutoTab:AddToggle({ Name="Auto Hatch Ready Eggs", Default=false, Flag="hatch_auto",
         Callback=safeC(function(v) autoHatchEnabled=v; Notify("Auto Hatch",v and "Aktif" or "Nonaktif",v and "Success" or "Error") end) })
-    HatchSub:AddToggle({ Name="Auto Place Egg in Pen (After Steal)", Default=false, Flag="plant_auto",
+    AutoTab:AddToggle({ Name="Auto Place Egg in Pen (After Steal)", Default=false, Flag="plant_auto",
         Callback=function(v) autoPlantEnabled=v; Notify("Auto Place",v and "Aktif" or "Nonaktif",v and "Success" or "Error") end })
-    HatchSub:AddSlider({ Name="Hatch Check Delay", Min=0.5, Max=10, Default=2.0, Suffix="s", Flag="hatch_gap",
+    AutoTab:AddSlider({ Name="Hatch Check Delay", Min=0.5, Max=10, Default=2.0, Suffix="s", Flag="hatch_gap",
         Callback=function(v) hatchCheckDelay=tonumber(v) or 2.0 end })
-    HatchSub:AddButton({ Name="Hatch All Ready Eggs Now", Primary=true,
+    AutoTab:AddButton({ Name="Hatch All Ready Eggs Now", Primary=true,
         Callback=safeC(function()
             local count=HatchAllReadyEggs()
             Notify("Hatch","Hatched "..count.." egg(s)","Success")
         end) })
-    HatchSub:AddButton({ Name="Place Carried Eggs in Pen Now",
+    AutoTab:AddButton({ Name="Place Carried Eggs in Pen Now",
         Callback=safeC(function()
             local count=PlantCarriedEggs()
             Notify("Plant","Planted "..count.." egg(s)","Success")

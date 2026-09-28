@@ -154,27 +154,26 @@ local function Init(HUB)
     -- Combat Tab dari main
 
     -- Bat & Slap Aura
-    local BatSub = Tab:AddSection("Bat & Slap Aura")
-    HUB.UI.BatSub = BatSub
+    Tab:AddSection("Bat & Slap Aura")
 
-    BatSub:AddToggle({
+    Tab:AddToggle({
         Name = "Bat / Slap Aura", Default = false, Flag = "bat_aura_enabled",
         Callback = safeCallback(function(v)
             batAuraEnabled = v
             Notify("Bat Aura", v and "Aktif" or "Nonaktif", v and "Success" or "Error")
         end)
     })
-    BatSub:AddSlider({
+    Tab:AddSlider({
         Name = "Aura Radius", Min = 5, Max = 50, Default = 20,
         Suffix = " studs", Flag = "bat_radius",
         Callback = function(v) batAuraRadius = tonumber(v) or 20 end
     })
-    BatSub:AddSlider({
+    Tab:AddSlider({
         Name = "Swing Delay", Min = 0.05, Max = 1.0, Default = 0.2,
         Suffix = "s", Flag = "bat_delay",
         Callback = function(v) batAuraDelay = tonumber(v) or 0.2 end
     })
-    BatSub:AddButton({
+    Tab:AddButton({
         Name = "Swing Bat Once (Manual)", Primary = true,
         Callback = safeCallback(function()
             local re = GetNetRemote("RE/BatSwing/Trigger")
@@ -184,10 +183,9 @@ local function Init(HUB)
     })
 
     -- Defense & Guards
-    local GuardSub = Tab:AddSection("Defense & Guards")
-    HUB.UI.GuardSub = GuardSub
+    Tab:AddSection("Defense & Guards")
 
-    GuardSub:AddToggle({
+    Tab:AddToggle({
         Name = "Anti-Trap (Full Immunity / Destroy Hitboxes)", Default = true, Flag = "avoid_traps",
         Callback = safeCallback(function(v)
             avoidTrapsEnabled = v
@@ -195,14 +193,14 @@ local function Init(HUB)
             Notify("Anti-Trap", v and "Immunity aktif" or "Nonaktif", v and "Success" or "Error")
         end)
     })
-    GuardSub:AddToggle({
+    Tab:AddToggle({
         Name = "No Knockback / Ragdoll Immunity", Default = true, Flag = "no_knockback",
         Callback = safeCallback(function(v)
             SetNoKnockback(v)
             Notify("Knockback", v and "Immunity aktif" or "Enabled kembali", v and "Success" or "Error")
         end)
     })
-    GuardSub:AddToggle({
+    Tab:AddToggle({
         Name = "Anti-Ragdoll (Quick Standup)", Default = true, Flag = "anti_ragdoll",
         Callback = function(v) antiRagdollEnabled = v end
     })

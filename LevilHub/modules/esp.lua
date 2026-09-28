@@ -319,23 +319,23 @@ local function Init(HUB)
     -- TAB UI
     -- ============================================================
     local Tab = HUB.UI.Tabs["ESP"]
-    local EspSub  = Tab:AddSection("Egg Tracker ESP")
+    Tab:AddSection("Egg Tracker ESP")
     -- subtab ESP
 
     local safeC = safeCallback
 
-    EspSub:AddToggle({
+    Tab:AddToggle({
         Name = "Egg ESP Enabled", Default = false, Flag = "esp_eggs_enabled",
         Callback = safeC(function(v)
             esp.enabled = v
             Notify("Egg ESP", v and "Aktif" or "Nonaktif", v and "Success" or "Error")
         end)
     })
-    EspSub:AddToggle({
+    Tab:AddToggle({
         Name = "Show 3D Pet Image Badges", Default = true, Flag = "esp_pet_icons",
         Callback = function(v) esp.showPetIcons = v end
     })
-    EspSub:AddToggle({
+    Tab:AddToggle({
         Name = "Trap ESP (Highlights Enemy Traps)", Default = false, Flag = "esp_traps",
         Callback = safeC(function(v)
             esp.traps = v
@@ -343,11 +343,11 @@ local function Init(HUB)
             Notify("Trap ESP", v and "Aktif" or "Nonaktif", v and "Success" or "Error")
         end)
     })
-    EspSub:AddToggle({
+    Tab:AddToggle({
         Name = "Show Mutated / Rare Eggs Only", Default = false, Flag = "esp_eggs_rare_only",
         Callback = function(v) esp.rareEggsOnly = v end
     })
-    EspSub:AddSlider({
+    Tab:AddSlider({
         Name = "Max ESP Distance", Min = 400, Max = 9999, Default = 800,
         Suffix = " studs", Flag = "esp_max_dist",
         Callback = function(v) esp.maxDistance = tonumber(v) or 800 end
