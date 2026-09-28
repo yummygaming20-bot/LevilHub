@@ -14,7 +14,7 @@ local function Init(HUB)
     -- ============================================================
     -- TAMBAH SUBTAB DI DALAM TAB
     -- ============================================================
-    Tab:AddSection("Nama SubTab")
+    Tab:Section({ Title = "Nama SubTab" })
 
     -- ============================================================
     -- STATE
@@ -34,8 +34,8 @@ local function Init(HUB)
     -- ============================================================
     -- UI CONTROLS
     -- ============================================================
-    Tab:AddToggle({
-        Name     = "Contoh Toggle",
+    Tab:Toggle({
+        Title = "Contoh Toggle",
         Default  = false,
         Flag     = "nama_flag_unik",
         Callback = safeC(function(v)
@@ -44,9 +44,8 @@ local function Init(HUB)
         end),
     })
 
-    Tab:AddSlider({
-        Name     = "Contoh Slider",
-        Min      = 1, Max = 100, Default = 50,
+    Tab:Slider({
+        Title = "Contoh Slider", Value = {Min=1, Max=100, Default=50},
         Suffix   = "x",
         Flag     = "nama_slider_flag",
         Callback = function(v)
@@ -54,8 +53,8 @@ local function Init(HUB)
         end,
     })
 
-    Tab:AddButton({
-        Name     = "Contoh Button",
+    Tab:Button({
+        Title = "Contoh Button",
         Primary  = true,
         Callback = safeC(function()
             Notify("NAMA_MODUL", "Button ditekan!", "Info")

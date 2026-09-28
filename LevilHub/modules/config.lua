@@ -123,23 +123,23 @@ local function Init(HUB)
     local Tab = HUB.UI.Tabs["Settings"]
     HUB.UI.SettingsTab = Tab
 
-    Tab:AddSection("Configuration")
+    Tab:Section({ Title = "Configuration" })
 
-    Tab:AddToggle({
-        Name = "Auto Save Config", Default = true, Flag = "settings_autosave",
+    Tab:Toggle({
+        Title = "Auto Save Config", Default = true, Flag = "settings_autosave",
         Callback = function(v) CFG.autoSave = v == true end
     })
 
-    Tab:AddButton({
-        Name = "Save Config Now", Primary = true,
+    Tab:Button({
+        Title = "Save Config Now", Primary = true,
         Callback = safeCallback(function()
             local ok = cfgWrite()
             Notify("Config", ok and "Config tersimpan!" or "Gagal simpan (executor tidak support writefile)", ok and "Success" or "Error")
         end)
     })
 
-    Tab:AddButton({
-        Name = "Load Config",
+    Tab:Button({
+        Title = "Load Config",
         Callback = safeCallback(function()
             local saved = cfgRead()
             if not saved then
@@ -152,8 +152,8 @@ local function Init(HUB)
         end)
     })
 
-    Tab:AddButton({
-        Name = "Reset Config",
+    Tab:Button({
+        Title = "Reset Config",
         Callback = safeCallback(function()
             CFG.data = {}
             cfgWrite()
@@ -162,10 +162,10 @@ local function Init(HUB)
     })
 
     -- Unloader
-    Tab:AddSection("Unload")
+    Tab:Section({ Title = "Unload" })
 
-    Tab:AddButton({
-        Name = "Unload LevilHub", Primary = true,
+    Tab:Button({
+        Title = "Unload LevilHub", Primary = true,
         Callback = safeCallback(function()
             Notify("LevilHub", "Unloading...", "Info", 2)
             task.delay(0.5, function()
@@ -176,8 +176,8 @@ local function Init(HUB)
         end)
     })
 
-    Tab:AddToggle({
-        Name = "Auto Resume on Rejoin", Default = true, Flag = "settings_resume",
+    Tab:Toggle({
+        Title = "Auto Resume on Rejoin", Default = true, Flag = "settings_resume",
         Callback = safeCallback(function(v)
             -- Queue resume script di executor
             if v and type(writefile) == "function" then
@@ -205,7 +205,7 @@ end
     })
 
     -- Version info
-    Tab:AddParagraph({
+    Tab:Paragraph({
         Title   = "LevilHub Info",
         Content = "Version modular — levilstore.my.id\nBuild: " .. tostring(os.date and os.date("%Y-%m-%d") or "2025")
     })
