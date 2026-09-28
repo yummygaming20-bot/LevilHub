@@ -268,6 +268,7 @@ local Window = WindUI:CreateWindow({
     Theme        = "Dark",
     DisableRayfieldLoader = true,
     KeySystem    = false,
+    NewElements  = true,
 })
 HUB.Window = Window
 
