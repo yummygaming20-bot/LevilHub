@@ -39,7 +39,6 @@ local function loadModule(path)
     return chunk
 end
 
--- Load dan jalankan main
 local ok, err = xpcall(function()
     loadModule("main.lua")()
 end, function(msg)
@@ -50,7 +49,6 @@ end, function(msg)
 end)
 
 if not ok then
-    -- Coba tampilkan error di screen kalau main belum sempat setup UI
     warn("[LevilHub LOADER ERROR]\n" .. tostring(err))
     pcall(function()
         local sg = Instance.new("ScreenGui")
