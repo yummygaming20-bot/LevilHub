@@ -11,7 +11,7 @@ local function Init(HUB)
     -- ============================================================
     -- STATE
     -- ============================================================
-    local bypassEnabled  = false
+    local bypassEnabled  = true
     local godModeEnabled = false
     local godModeLoop    = nil   -- RBXScriptConnection / task handle
     local charConn       = nil   -- CharacterAdded connection
