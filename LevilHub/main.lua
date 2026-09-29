@@ -15,7 +15,6 @@ local TAB_DEFS = {
 local MODULE_LIST = {
     { path="modules/esp.lua",      label="ESP"         },
     { path="modules/combat.lua",   label="Combat"      },
-    { path="modules/movement.lua", label="Movement"    },
     { path="modules/base.lua",     label="Base / Plot" },
     { path="modules/config.lua",   label="Settings"    },
 }
