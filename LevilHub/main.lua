@@ -1,4 +1,4 @@
--- LevilHub Main
+
 if not game then error("[LevilHub] Harus dijalankan di Roblox.") end
 
 local BASE_URL       = "https://raw.githubusercontent.com/yummygaming20-bot/LevilHub/main/LevilHub/"
@@ -64,9 +64,6 @@ function HUB.Notify(title,body,_,duration)
     end)
 end
 
--- ============================================================
--- BOOT PANEL
--- ============================================================
 local BootPanel={}
 do
     local function getParent()
@@ -150,9 +147,6 @@ local function compileModule(path,src)
     return chunk
 end
 
--- ============================================================
--- BOOT
--- ============================================================
 BootPanel.Init()
 BootPanel.Set("LevilHub","Memuat WindUI...",0.05)
 
@@ -176,10 +170,9 @@ HUB.WindUI=WindUI
 
 BootPanel.Set("LevilHub","Membangun interface...",0.12)
 
--- Buat Window
 local Window
 do
-    -- Coba semua method yang mungkin ada di WindUI
+    
     local methods={"CreateWindow","new","Init","Load"}
     for _,m in ipairs(methods) do
         if type(WindUI[m])=="function" then
@@ -189,7 +182,7 @@ do
                 Folder="LevilHub",
                 Size=UDim2.fromOffset(580,460),
                 Transparent=true, Theme="Dark",
-                NewElements=true, -- sama seperti contoh resmi
+                NewElements=true, 
                 DisableRayfieldLoader=true,
                 KeySystem=false,
             })
@@ -203,10 +196,6 @@ do
 end
 HUB.Window=Window
 
--- ============================================================
--- TAB (sesuai doc WindUI: Window:Tab({ Title, Icon }))
--- https://footagesus.github.io/treehub-web/docs/windui/tab
--- ============================================================
 BootPanel.Set("LevilHub","Membangun tabs...",0.18)
 
 local function makeTab(def)
@@ -220,7 +209,7 @@ local function makeTab(def)
         warn("[LevilHub] Gagal buat tab "..def.name..": "..tostring(tab))
         return nil
     end
-    -- Shim: modul lama manggil Tab:AddParagraph({Title, Content})
+    
     if not tab.AddParagraph then
         tab.AddParagraph=function(self,o)
             o=o or {}
@@ -235,12 +224,6 @@ for _,def in ipairs(TAB_DEFS) do
     if tab then HUB.UI.Tabs[def.key]=tab end
 end
 
--- ============================================================
--- SECTION HELPER
--- Modul manggil Section:AddToggle/AddSlider/AddButton/AddDropdown/
--- AddMultiDropdown/AddParagraph (Name/Default/Options). Wrapper ini
--- nerjemahin ke element API WindUI (Title/Value/Values).
--- ============================================================
 local function wrapContainer(c)
     local W={ Raw=c }
     function W:AddToggle(o)
@@ -278,7 +261,7 @@ local function wrapContainer(c)
         o=o or {}
         return c:Paragraph({ Title=o.Title or o.Name or "", Desc=o.Content or o.Desc })
     end
-    -- hitung elemen & log error per elemen supaya gampang didiagnosa
+    
     for _,name in ipairs({"AddToggle","AddSlider","AddButton","AddDropdown","AddMultiDropdown","AddParagraph"}) do
         local raw=W[name]
         W[name]=function(self,o)
@@ -299,8 +282,7 @@ HUB.UI.ElementCount = 0
 function HUB.UI.MakeSection(tabKey, sectionName)
     local tab=HUB.UI.Tabs[tabKey]
     if not tab then warn("[LevilHub] Tab tidak ditemukan: "..tostring(tabKey)); return nil end
-    -- Sama seperti contoh resmi: Tab:Section({ Title, Box, BoxBorder, Opened = true })
-    -- Opened = true penting, kalau tidak section-nya ketutup dan isinya tidak kelihatan.
+
     local ok,sec=pcall(function()
         return tab:Section({
             Title     = tostring(sectionName),
@@ -311,15 +293,11 @@ function HUB.UI.MakeSection(tabKey, sectionName)
     end)
     if not ok or not sec then
         warn("[LevilHub] Gagal buat section '"..tostring(sectionName).."': "..tostring(sec))
-        sec=tab -- fallback: elemen langsung di tab
+        sec=tab 
     end
     return wrapContainer(sec)
 end
 
--- ============================================================
--- EXPOSE HUB KE _G (agar modul bisa akses setelah obfuscate)
--- WeAreDevs obfuscator rename local variable, tapi _G tidak.
--- ============================================================
 _G.LevilHub      = HUB
 _G.LH_MakeSection = function(tabKey, sectionName)
     return HUB.UI.MakeSection(tabKey, sectionName)
@@ -329,9 +307,6 @@ _G.LH_Notify     = function(...) return HUB.Notify(...) end
 _G.LH_Track      = function(...) return HUB.Track(...) end
 _G.LH_Window     = HUB.Window
 
--- ============================================================
--- LOAD MODUL
--- ============================================================
 local total=#MODULE_LIST
 for i,modInfo in ipairs(MODULE_LIST) do
     local progress=0.22+(0.75*(i-1)/total)
@@ -366,7 +341,7 @@ for i,modInfo in ipairs(MODULE_LIST) do
         BootPanel.Error("Error di modul: "..modInfo.label.."\n"..tostring(result))
         error("[LevilHub] Modul "..modInfo.label.." error:\n"..tostring(result))
     end
-    -- Modul mengembalikan fungsi Init(HUB) -> harus dipanggil supaya UI-nya dibuat
+    
     if type(result)=="function" then
         local ok2,res2=xpcall(function()
             return result(HUB)
