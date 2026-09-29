@@ -208,8 +208,15 @@ local function makeTab(name,icon)
     local methods={"CreateTab","AddTab","MakeTab","Tab"}
     for _,m in ipairs(methods) do
         if type(Window[m])=="function" then
+            -- Coba format table {Name, Icon}
             local ok,result=pcall(Window[m],Window,{Name=name,Icon=icon})
-            if ok and result then tab=result; break end
+            if ok and result and type(result)=="table" then tab=result; break end
+            -- Coba format string langsung
+            local ok2,result2=pcall(Window[m],Window,name,icon)
+            if ok2 and result2 and type(result2)=="table" then tab=result2; break end
+            -- Coba format string saja tanpa icon
+            local ok3,result3=pcall(Window[m],Window,name)
+            if ok3 and result3 and type(result3)=="table" then tab=result3; break end
         end
     end
     return tab
@@ -230,15 +237,21 @@ function HUB.UI.MakeSection(tabKey, sectionName)
     local tab = HUB.UI.Tabs[tabKey]
     if not tab then warn("[LevilHub] Tab tidak ditemukan: "..tostring(tabKey)); return nil end
     local section
-    local methods={"CreateSection","AddSection","Section","AddSubTab","CreateSubTab"}
+    local methods={"CreateSection","AddSection","Section","AddSubTab","CreateSubTab","AddParagraph"}
     for _,m in ipairs(methods) do
         if type(tab[m])=="function" then
-            local ok,result=pcall(tab[m],tab,{Name=sectionName})
-            if ok and result then section=result; break end
-            -- Beberapa versi terima string langsung
-            local ok2,result2=pcall(tab[m],tab,sectionName)
+            -- Coba string langsung dulu (WindUI 1.6.x biasanya begini)
+            local ok,result=pcall(tab[m],tab,sectionName)
+            if ok and result and type(result)=="table" then section=result; break end
+            -- Coba table {Name=...}
+            local ok2,result2=pcall(tab[m],tab,{Name=sectionName})
             if ok2 and result2 and type(result2)=="table" then section=result2; break end
         end
+    end
+    -- Fallback: kembalikan tab itu sendiri supaya AddToggle dll tetap jalan
+    if not section then
+        warn("[LevilHub] MakeSection fallback ke tab untuk: "..tostring(sectionName))
+        section = tab
     end
     return section
 end
