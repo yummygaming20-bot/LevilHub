@@ -1,7 +1,7 @@
 -- LevilHub Main
 if not game then error("[LevilHub] Harus dijalankan di Roblox.") end
 
-local BASE_URL       = "https://raw.githubusercontent.com/yummygaming20-bot/LevilHub/refs/heads/main/LevilHub/"
+local BASE_URL       = "https://raw.githubusercontent.com/yummygaming20-bot/LevilHub/main/LevilHub/"
 local WindUI_VERSION = "1.6.66"
 
 local TAB_DEFS = {
@@ -201,59 +201,92 @@ do
 end
 HUB.Window=Window
 
--- Buat Tab — coba semua method
+-- ============================================================
+-- TAB (sesuai doc WindUI: Window:Tab({ Title, Icon }))
+-- https://footagesus.github.io/treehub-web/docs/windui/tab
+-- ============================================================
 BootPanel.Set("LevilHub","Membangun tabs...",0.18)
-local function makeTab(name,icon)
-    local tab
-    local methods={"CreateTab","AddTab","MakeTab","Tab"}
-    for _,m in ipairs(methods) do
-        if type(Window[m])=="function" then
-            -- Coba format table {Name, Icon}
-            local ok,result=pcall(Window[m],Window,{Name=name,Icon=icon})
-            if ok and result and type(result)=="table" then tab=result; break end
-            -- Coba format string langsung
-            local ok2,result2=pcall(Window[m],Window,name,icon)
-            if ok2 and result2 and type(result2)=="table" then tab=result2; break end
-            -- Coba format string saja tanpa icon
-            local ok3,result3=pcall(Window[m],Window,name)
-            if ok3 and result3 and type(result3)=="table" then tab=result3; break end
+
+local function makeTab(def)
+    local ok,tab=pcall(function()
+        return Window:Tab({
+            Title = def.name,
+            Icon  = def.icon,
+        })
+    end)
+    if not ok or not tab then
+        warn("[LevilHub] Gagal buat tab "..def.name..": "..tostring(tab))
+        return nil
+    end
+    -- Shim: modul lama manggil Tab:AddParagraph({Title, Content})
+    if not tab.AddParagraph then
+        tab.AddParagraph=function(self,o)
+            o=o or {}
+            return self:Paragraph({ Title=o.Title or o.Name or "", Desc=o.Content or o.Desc })
         end
     end
     return tab
 end
 
 for _,def in ipairs(TAB_DEFS) do
-    local tab=makeTab(def.name,def.icon)
-    if tab then
-        HUB.UI.Tabs[def.key]=tab
-    else
-        warn("[LevilHub] Gagal buat tab: "..def.name)
-    end
+    local tab=makeTab(def)
+    if tab then HUB.UI.Tabs[def.key]=tab end
 end
 
--- Expose helper buat modul — bikin section di dalam tab
--- WindUI 1.6.66 pakai CreateSection bukan AddSubTab
-function HUB.UI.MakeSection(tabKey, sectionName)
-    local tab = HUB.UI.Tabs[tabKey]
-    if not tab then warn("[LevilHub] Tab tidak ditemukan: "..tostring(tabKey)); return nil end
-    local section
-    local methods={"CreateSection","AddSection","Section","AddSubTab","CreateSubTab","AddParagraph"}
-    for _,m in ipairs(methods) do
-        if type(tab[m])=="function" then
-            -- Coba string langsung dulu (WindUI 1.6.x biasanya begini)
-            local ok,result=pcall(tab[m],tab,sectionName)
-            if ok and result and type(result)=="table" then section=result; break end
-            -- Coba table {Name=...}
-            local ok2,result2=pcall(tab[m],tab,{Name=sectionName})
-            if ok2 and result2 and type(result2)=="table" then section=result2; break end
+-- ============================================================
+-- SECTION HELPER
+-- Modul manggil Section:AddToggle/AddSlider/AddButton/AddDropdown/
+-- AddMultiDropdown/AddParagraph (Name/Default/Options). Wrapper ini
+-- nerjemahin ke element API WindUI (Title/Value/Values).
+-- ============================================================
+local function wrapContainer(c)
+    local W={ Raw=c }
+    function W:AddToggle(o)
+        o=o or {}
+        return c:Toggle({ Title=o.Name, Desc=o.Desc, Value=o.Default==true, Flag=o.Flag, Callback=o.Callback })
+    end
+    function W:AddSlider(o)
+        o=o or {}
+        return c:Slider({
+            Title=o.Name, Desc=o.Desc, Flag=o.Flag, Step=o.Step,
+            Value={ Min=o.Min or 0, Max=o.Max or 100, Default=o.Default or o.Min or 0 },
+            Callback=o.Callback,
+        })
+    end
+    function W:AddButton(o)
+        o=o or {}
+        return c:Button({ Title=o.Name, Desc=o.Desc, Callback=o.Callback })
+    end
+    local function dropdown(o,multi)
+        o=o or {}
+        local el=c:Dropdown({
+            Title=o.Name, Desc=o.Desc, Flag=o.Flag,
+            Values=o.Options or {}, Value=o.Default, Multi=multi,
+            Callback=o.Callback,
+        })
+        if el and not el.SetOptions and type(el.Refresh)=="function" then
+            el.SetOptions=function(_,v) el:Refresh(v) end
         end
+        return el
     end
-    -- Fallback: kembalikan tab itu sendiri supaya AddToggle dll tetap jalan
-    if not section then
-        warn("[LevilHub] MakeSection fallback ke tab untuk: "..tostring(sectionName))
-        section = tab
+    function W:AddDropdown(o)      return dropdown(o,false) end
+    function W:AddMultiDropdown(o) return dropdown(o,true)  end
+    function W:AddParagraph(o)
+        o=o or {}
+        return c:Paragraph({ Title=o.Title or o.Name or "", Desc=o.Content or o.Desc })
     end
-    return section
+    return W
+end
+
+function HUB.UI.MakeSection(tabKey, sectionName)
+    local tab=HUB.UI.Tabs[tabKey]
+    if not tab then warn("[LevilHub] Tab tidak ditemukan: "..tostring(tabKey)); return nil end
+    local ok,sec=pcall(function() return tab:Section({ Title=sectionName }) end)
+    if not ok or not sec then
+        warn("[LevilHub] Gagal buat section '"..tostring(sectionName).."': "..tostring(sec))
+        sec=tab -- fallback: taruh element langsung di tab
+    end
+    return wrapContainer(sec)
 end
 
 -- ============================================================
@@ -299,6 +332,7 @@ for i,modInfo in ipairs(MODULE_LIST) do
     task.wait()
 end
 
+pcall(function() local first=HUB.UI.Tabs[TAB_DEFS[1].key]; if first then first:Select() end end)
 BootPanel.Set("LevilHub","Selesai!",1.0)
 task.wait(0.4)
 BootPanel.Close()

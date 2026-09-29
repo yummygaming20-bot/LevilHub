@@ -12,9 +12,9 @@ local function Init(HUB)
     local Tab = HUB.UI.Tabs["Auto"] -- ganti sesuai kebutuhan
 
     -- ============================================================
-    -- TAMBAH SUBTAB DI DALAM TAB
+    -- TAMBAH SECTION DI DALAM TAB
     -- ============================================================
-    local Section = Tab:AddSubTab("Nama SubTab")
+    local Section = HUB.UI.MakeSection("Auto", "Nama Section")
 
     -- ============================================================
     -- STATE
