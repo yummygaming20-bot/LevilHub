@@ -129,7 +129,7 @@ local function Init(HUB)
             if cam then cam.CameraSubject = newHum end
         end)
 
-        Notify("Bypass", "Anti-Cheat bypass aktif ✅", "Success", 3)
+        Notify("Bypass", "Anti-Cheat bypass aktif", "Success", 3)
     end
 
     -- ============================================================
@@ -195,8 +195,8 @@ local function Init(HUB)
 
     -- Toggle God Mode (sub-fitur, hanya efektif kalau bypass aktif)
     Section:AddToggle({
-        Name    = "God Mode (No Death)",
-        Desc    = "Lock HP = ∞ dan disable state Dead. Butuh Bypass aktif dulu.",
+        Name    = "God Mode (Unstable)",
+        Desc    = "Butuh Bypass aktif dulu.",
         Default = false,
         Flag    = "bypass_godmode",
         Callback = safeC(function(v)
@@ -210,7 +210,7 @@ local function Init(HUB)
                     ApplyGodMode(activeHumanoid)
                 end
                 StartGodLoop()
-                Notify("Bypass", "God Mode aktif — HP dikunci ∞", "Success", 3)
+                Notify("Bypass", "God Mode aktif!", "Success", 3)
             else
                 StopGodLoop()
                 -- Kembalikan MaxHealth normal (100) supaya tidak broken
@@ -246,11 +246,10 @@ local function Init(HUB)
     })
 
     Section:AddParagraph({
-        Title   = "⚠️ Catatan",
-        Content = "Clone humanoid bisa disconnect animasi/sounds sebentar.\n"
-               .. "God Mode: MaxHealth diset ∞ tiap 0.1 detik.\n"
-               .. "Re-run otomatis tiap CharacterAdded saat bypass aktif.",
-    })
+    Title = "⚠️ Catatan",
+    Content = "Beberapa fitur mungkin menyebabkan animasi atau suara terhenti sementara.\n"
+           .. "Fitur akan aktif kembali secara otomatis saat karakter respawn.",
+})
 
     -- ============================================================
     -- RETURN
