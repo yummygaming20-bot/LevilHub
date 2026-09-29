@@ -1,24 +1,11 @@
---[[
-██╗      ███████╗██╗      ██╗██╗██╗
-██║      ██╔════╝██║     ██║██║██║
-██║      █████╗  ██║     ██║██║██║
-██║      ██╔══╝  ╚██╗   ██╔╝██║██║
-███████╗███████╗ ╚████╔╝   ██║███████╗
-╚══════╝╚══════╝  ╚═══╝  ╚═╝╚══════╝
-
-██╗  ██╗██╗   ██╗██████╗
-██║  ██║██║   ██║██╔══██╗
-███████║██║   ██║██████╔╝
-██╔══██║██║   ██║██╔══██╗
-██║  ██║╚██████╔╝██████╔╝
-╚═╝  ╚═╝ ╚═════╝ ╚═════╝
-]]
+-- LevilHub Loader
+-- Jalankan file ini di executor kamu
 
 if not game then
     error("[LevilHub] Jalankan di Roblox executor, bukan Lua editor.")
 end
 
-local BASE_URL = "https://raw.githubusercontent.com/yummygaming20-bot/LevilHub/refs/heads/main/LevilHub/"
+local BASE_URL = "https://raw.githubusercontent.com/yummygaming20-bot/LevilHub/refs/heads/main/"
 
 local function fetch(path)
     local ok, result = pcall(function()
@@ -39,6 +26,7 @@ local function loadModule(path)
     return chunk
 end
 
+-- Load dan jalankan main
 local ok, err = xpcall(function()
     loadModule("main.lua")()
 end, function(msg)
@@ -49,6 +37,7 @@ end, function(msg)
 end)
 
 if not ok then
+    -- Coba tampilkan error di screen kalau main belum sempat setup UI
     warn("[LevilHub LOADER ERROR]\n" .. tostring(err))
     pcall(function()
         local sg = Instance.new("ScreenGui")
