@@ -5,7 +5,7 @@ if not game then
     error("[LevilHub] Jalankan di Roblox executor, bukan Lua editor.")
 end
 
-local BASE_URL = "https://raw.githubusercontent.com/yummygaming20-bot/LevilHub/refs/heads/main/"
+local BASE_URL = "https://raw.githubusercontent.com/yummygaming20-bot/LevilHub/refs/heads/main/LevilHub/"
 
 local function fetch(path)
     local ok, result = pcall(function()
