@@ -1,12 +1,5 @@
---[[
-  _____                        _    __    ____  ____             __        
- |_   _|                      (_)  [  |  |_   ||   _|           [  |       
-   | |       .---.   _   __   __    | |    | |__| |    __   _    | |.--.   
-   | |   _  / /__\\ [ \ [  ] [  |   | |    |  __  |   [  | | |   | '/'`\ \ 
-  _| |__/ | | \__.,  \ \/ /   | |   | |   _| |  | |_   | \_/ |,  |  \__/ | 
- |________|  '.__.'   \__/   [___] [___] |____||____|  '.__.'_/ [__;.__.'  
-                                                                           
---]]
+-- LevilHub Loader
+-- Jalankan file ini di executor kamu
 
 if not game then
     error("[LevilHub] Jalankan di Roblox executor, bukan Lua editor.")
@@ -33,6 +26,7 @@ local function loadModule(path)
     return chunk
 end
 
+-- Load dan jalankan main
 local ok, err = xpcall(function()
     loadModule("main.lua")()
 end, function(msg)
@@ -43,6 +37,7 @@ end, function(msg)
 end)
 
 if not ok then
+    -- Coba tampilkan error di screen kalau main belum sempat setup UI
     warn("[LevilHub LOADER ERROR]\n" .. tostring(err))
     pcall(function()
         local sg = Instance.new("ScreenGui")
