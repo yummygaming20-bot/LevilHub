@@ -61,7 +61,7 @@ local function Init(HUB)
     local function getEspContainer()
         if espContainer and espContainer.Parent then return espContainer end
         local c = Instance.new("Folder")
-        c.Name   = "LevilHub_ESP"
+        c.Title = "LevilHub_ESP"
         c.Parent = Workspace
         espContainer = c
         table.insert(HUB.highlights, c) -- auto-cleanup on unload
@@ -104,7 +104,7 @@ local function Init(HUB)
             -- Criar billboard
             local holder = getEspContainer()
             local part = Instance.new("Part")
-            part.Name              = "LSS_EspAnchor"
+            part.Title = "LSS_EspAnchor"
             part.Size              = Vector3.new(1,1,1)
             part.Transparency      = 1
             part.Anchored          = true
@@ -115,7 +115,7 @@ local function Init(HUB)
             part.Parent            = holder
 
             local gui = Instance.new("BillboardGui")
-            gui.Name              = "LSS_EggCard"
+            gui.Title = "LSS_EggCard"
             gui.Adornee           = part
             gui.Size              = UDim2.fromOffset(200, 84)
             gui.StudsOffset       = Vector3.new(0, 3.5, 0)
@@ -125,7 +125,7 @@ local function Init(HUB)
             gui.Parent            = part
 
             local frame = Instance.new("Frame")
-            frame.Name                  = "Card"
+            frame.Title = "Card"
             frame.Size                  = UDim2.fromScale(1,1)
             frame.BackgroundColor3      = Color3.fromRGB(5,12,30)
             frame.BackgroundTransparency = 0.14
@@ -142,7 +142,7 @@ local function Init(HUB)
 
             -- Icon box
             local iconBox = Instance.new("Frame")
-            iconBox.Name                  = "IconBox"
+            iconBox.Title = "IconBox"
             iconBox.Size                  = UDim2.fromOffset(52,52)
             iconBox.Position              = UDim2.fromOffset(8,14)
             iconBox.BackgroundColor3      = Color3.fromRGB(3,8,22)
@@ -152,7 +152,7 @@ local function Init(HUB)
             Instance.new("UICorner", iconBox).CornerRadius = UDim.new(0,8)
 
             local icon = Instance.new("ImageLabel")
-            icon.Name                  = "Icon"
+            icon.Title = "Icon"
             icon.Size                  = UDim2.fromScale(0.82,0.82)
             icon.Position              = UDim2.fromScale(0.5,0.5)
             icon.AnchorPoint           = Vector2.new(0.5,0.5)
@@ -319,36 +319,36 @@ local function Init(HUB)
     -- TAB UI
     -- ============================================================
     local Tab = HUB.UI.Tabs["ESP"]
-    local EspSub  = HUB.UI.MakeSection("ESP", "Egg Tracker ESP")
+    Tab:Section({ Title = "Egg Tracker ESP" })
     -- subtab ESP
 
     local safeC = safeCallback
 
-    EspSub:AddToggle({
-        Name = "Egg ESP Enabled", Default = false, Flag = "esp_eggs_enabled",
+    Tab:Toggle({
+        Title = "Egg ESP Enabled", Default = false, Flag = "esp_eggs_enabled",
         Callback = safeC(function(v)
             esp.enabled = v
             Notify("Egg ESP", v and "Aktif" or "Nonaktif", v and "Success" or "Error")
         end)
     })
-    EspSub:AddToggle({
-        Name = "Show 3D Pet Image Badges", Default = true, Flag = "esp_pet_icons",
+    Tab:Toggle({
+        Title = "Show 3D Pet Image Badges", Default = true, Flag = "esp_pet_icons",
         Callback = function(v) esp.showPetIcons = v end
     })
-    EspSub:AddToggle({
-        Name = "Trap ESP (Highlights Enemy Traps)", Default = false, Flag = "esp_traps",
+    Tab:Toggle({
+        Title = "Trap ESP (Highlights Enemy Traps)", Default = false, Flag = "esp_traps",
         Callback = safeC(function(v)
             esp.traps = v
             if not v then clearTrapHighlights() end
             Notify("Trap ESP", v and "Aktif" or "Nonaktif", v and "Success" or "Error")
         end)
     })
-    EspSub:AddToggle({
-        Name = "Show Mutated / Rare Eggs Only", Default = false, Flag = "esp_eggs_rare_only",
+    Tab:Toggle({
+        Title = "Show Mutated / Rare Eggs Only", Default = false, Flag = "esp_eggs_rare_only",
         Callback = function(v) esp.rareEggsOnly = v end
     })
-    EspSub:AddSlider({
-        Name = "Max ESP Distance", Min = 400, Max = 9999, Default = 800,
+    Tab:Slider({
+        Title = "Max ESP Distance", Value = {Min=400, Max=9999, Default=800},
         Suffix = " studs", Flag = "esp_max_dist",
         Callback = function(v) esp.maxDistance = tonumber(v) or 800 end
     })
