@@ -12,9 +12,9 @@ local function Init(HUB)
     local Tab = HUB.UI.Tabs["Auto"] -- ganti sesuai kebutuhan
 
     -- ============================================================
-    -- TAMBAH SUBTAB DI DALAM TAB
+    -- TAMBAH SECTION DI DALAM TAB
     -- ============================================================
-    Tab:Section({ Title = "Nama SubTab" })
+    local Section = HUB.UI.MakeSection("Auto", "Nama Section")
 
     -- ============================================================
     -- STATE
@@ -34,8 +34,8 @@ local function Init(HUB)
     -- ============================================================
     -- UI CONTROLS
     -- ============================================================
-    Tab:Toggle({
-        Title = "Contoh Toggle",
+    Section:AddToggle({
+        Name     = "Contoh Toggle",
         Default  = false,
         Flag     = "nama_flag_unik",
         Callback = safeC(function(v)
@@ -44,8 +44,9 @@ local function Init(HUB)
         end),
     })
 
-    Tab:Slider({
-        Title = "Contoh Slider", Value = {Min=1, Max=100, Default=50},
+    Section:AddSlider({
+        Name     = "Contoh Slider",
+        Min      = 1, Max = 100, Default = 50,
         Suffix   = "x",
         Flag     = "nama_slider_flag",
         Callback = function(v)
@@ -53,8 +54,8 @@ local function Init(HUB)
         end,
     })
 
-    Tab:Button({
-        Title = "Contoh Button",
+    Section:AddButton({
+        Name     = "Contoh Button",
         Primary  = true,
         Callback = safeC(function()
             Notify("NAMA_MODUL", "Button ditekan!", "Info")

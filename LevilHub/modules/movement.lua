@@ -267,10 +267,11 @@ local function Init(HUB)
     -- Player Tab dari main
 
     -- Movement
-    Tab:Section({ Title = "Movement" })
+    local MoveSub = HUB.UI.MakeSection("Player", "Movement")
+    HUB.UI.MoveSub = MoveSub
 
-    Tab:Toggle({
-        Title = "Enable WalkSpeed", Default = false, Flag = "speed_enabled",
+    MoveSub:AddToggle({
+        Name = "Enable WalkSpeed", Default = false, Flag = "speed_enabled",
         Callback = safeCallback(function(v)
             walkSpeedEnabled = v
             local hum = findHum()
@@ -285,61 +286,61 @@ local function Init(HUB)
             Notify("WalkSpeed", v and "Aktif" or "Nonaktif", v and "Success" or "Error")
         end)
     })
-    Tab:Slider({
-        Title = "WalkSpeed Value", Value = {Min=16, Max=500, Default=60},
+    MoveSub:AddSlider({
+        Name = "WalkSpeed Value", Min = 16, Max = 500, Default = 60,
         Suffix = " studs/s", Flag = "speed_val",
         Callback = function(v)
             walkSpeedValue = tonumber(v) or 60
             ApplyWalkSpeed(walkSpeedValue)
         end
     })
-    Tab:Toggle({
-        Title = "Enable JumpPower", Default = false, Flag = "jump_enabled",
+    MoveSub:AddToggle({
+        Name = "Enable JumpPower", Default = false, Flag = "jump_enabled",
         Callback = safeCallback(function(v)
             jumpPowerEnabled = v
             if v then ApplyJumpPower(jumpPowerValue) end
         end)
     })
-    Tab:Slider({
-        Title = "JumpPower Value", Value = {Min=50, Max=500, Default=100},
+    MoveSub:AddSlider({
+        Name = "JumpPower Value", Min = 50, Max = 500, Default = 100,
         Flag = "jump_val",
         Callback = function(v)
             jumpPowerValue = tonumber(v) or 100
             ApplyJumpPower(jumpPowerValue)
         end
     })
-    Tab:Toggle({
-        Title = "Infinite Jump", Default = false, Flag = "phuc_infinite_jump",
+    MoveSub:AddToggle({
+        Name = "Infinite Jump", Default = false, Flag = "phuc_infinite_jump",
         Callback = function(v) infiniteJump = v end
     })
-    Tab:Toggle({
-        Title = "Smooth Fly (WASD + Space/Shift)", Default = false, Flag = "fly_enabled",
+    MoveSub:AddToggle({
+        Name = "Smooth Fly (WASD + Space/Shift)", Default = false, Flag = "fly_enabled",
         Callback = safeCallback(function(v)
             flyEnabled = v
             if v then StartFly() else StopFly() end
             Notify("Fly", v and "Aktif" or "Nonaktif", v and "Success" or "Error")
         end)
     })
-    Tab:Slider({
-        Title = "Fly Speed", Value = {Min=20, Max=500, Default=80},
+    MoveSub:AddSlider({
+        Name = "Fly Speed", Min = 20, Max = 500, Default = 80,
         Flag = "fly_speed",
         Callback = function(v) flySpeed = tonumber(v) or 80 end
     })
-    Tab:Toggle({
-        Title = "Anti-AFK (Bypass 20min Kick)", Default = true, Flag = "anti_afk",
+    MoveSub:AddToggle({
+        Name = "Anti-AFK (Bypass 20min Kick)", Default = true, Flag = "anti_afk",
         Callback = function(v) SetAntiAFK(v) end
     })
 
     -- Area Travel
-    Tab:Section({ Title = "Area Travel" })
+    local AreaTpSub = HUB.UI.MakeSection("Player", "Area Travel")
     local selectedAreaTp = "Base / Plot"
 
-    Tab:Dropdown({
-        Title = "Select Area", Options = AREA_KEYS, Default = "Base / Plot", Flag = "tele_area",
+    AreaTpSub:AddDropdown({
+        Name = "Select Area", Options = AREA_KEYS, Default = "Base / Plot", Flag = "tele_area",
         Callback = function(v) selectedAreaTp = v end
     })
-    Tab:Button({
-        Title = "Travel to Selected Area", Primary = true,
+    AreaTpSub:AddButton({
+        Name = "Travel to Selected Area", Primary = true,
         Callback = safeCallback(function()
             local pos = AREA_COORDINATES[selectedAreaTp]
             if not pos then Notify("Travel", "Area tidak ditemukan", "Error"); return end
@@ -349,10 +350,10 @@ local function Init(HUB)
     })
 
     -- Plot Travel
-    Tab:Section({ Title = "Plot Travel" })
+    local PlotSub = HUB.UI.MakeSection("Player", "Plot Travel")
 
-    Tab:Button({
-        Title = "My Plot", Primary = true,
+    PlotSub:AddButton({
+        Name = "My Plot", Primary = true,
         Callback = safeCallback(function()
             local RS = game:GetService("ReplicatedStorage")
             local PlotState
@@ -368,7 +369,7 @@ local function Init(HUB)
     })
 
     -- Player Travel
-    Tab:Section({ Title = "Player Travel" })
+    local PlayerSub = HUB.UI.MakeSection("Player", "Player Travel")
     local selectedPlayer = nil
     local playerNames    = {}
 
@@ -382,20 +383,20 @@ local function Init(HUB)
     end
     refreshPlayers()
 
-    local playerDropdown = Tab:Dropdown({
-        Title = "Select Player", Options = playerNames, Default = playerNames[1], Flag = "tp_player",
+    local playerDropdown = PlayerSub:AddDropdown({
+        Name = "Select Player", Options = playerNames, Default = playerNames[1], Flag = "tp_player",
         Callback = function(v) selectedPlayer = v end
     })
-    Tab:Button({
-        Title = "Refresh Player List",
+    PlayerSub:AddButton({
+        Name = "Refresh Player List",
         Callback = safeCallback(function()
             refreshPlayers()
             if playerDropdown.SetOptions then playerDropdown:SetOptions(playerNames) end
             Notify("Travel", "List diperbarui", "Info")
         end)
     })
-    Tab:Button({
-        Title = "Travel to Player", Primary = true,
+    PlayerSub:AddButton({
+        Name = "Travel to Player", Primary = true,
         Callback = safeCallback(function()
             if not selectedPlayer or selectedPlayer == "(no other players)" then
                 Notify("Travel", "Pilih player dulu", "Info"); return
@@ -409,16 +410,16 @@ local function Init(HUB)
     })
 
     -- Visuals
-    Tab:Section({ Title = "Visuals & Performance" })
-    Tab:Toggle({
-        Title = "Fullbright (Daylight Visuals)", Default = false, Flag = "fullbright",
+    local VisSub = HUB.UI.MakeSection("Player", "Visuals & Performance")
+    VisSub:AddToggle({
+        Name = "Fullbright (Daylight Visuals)", Default = false, Flag = "fullbright",
         Callback = safeCallback(function(v)
             SetFullbright(v)
             Notify("Fullbright", v and "Aktif" or "Nonaktif", v and "Success" or "Error")
         end)
     })
-    Tab:Button({
-        Title = "Delete Own Pet Renders (FPS Boost)",
+    VisSub:AddButton({
+        Name = "Delete Own Pet Renders (FPS Boost)",
         Callback = safeCallback(function()
             local count = 0
             for _, container in ipairs({Workspace:FindFirstChild("Pets"), Workspace:FindFirstChild("RenderedPets")}) do

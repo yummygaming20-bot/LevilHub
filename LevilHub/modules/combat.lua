@@ -154,27 +154,28 @@ local function Init(HUB)
     -- Combat Tab dari main
 
     -- Bat & Slap Aura
-    Tab:Section({ Title = "Bat & Slap Aura" })
+    local BatSub = HUB.UI.MakeSection("Combat", "Bat & Slap Aura")
+    HUB.UI.BatSub = BatSub
 
-    Tab:Toggle({
-        Title = "Bat / Slap Aura", Default = false, Flag = "bat_aura_enabled",
+    BatSub:AddToggle({
+        Name = "Bat / Slap Aura", Default = false, Flag = "bat_aura_enabled",
         Callback = safeCallback(function(v)
             batAuraEnabled = v
             Notify("Bat Aura", v and "Aktif" or "Nonaktif", v and "Success" or "Error")
         end)
     })
-    Tab:Slider({
-        Title = "Aura Radius", Value = {Min=5, Max=50, Default=20},
+    BatSub:AddSlider({
+        Name = "Aura Radius", Min = 5, Max = 50, Default = 20,
         Suffix = " studs", Flag = "bat_radius",
         Callback = function(v) batAuraRadius = tonumber(v) or 20 end
     })
-    Tab:Slider({
-        Title = "Swing Delay", Value = {Min=0.05, Max=1.0, Default=0.2},
+    BatSub:AddSlider({
+        Name = "Swing Delay", Min = 0.05, Max = 1.0, Default = 0.2,
         Suffix = "s", Flag = "bat_delay",
         Callback = function(v) batAuraDelay = tonumber(v) or 0.2 end
     })
-    Tab:Button({
-        Title = "Swing Bat Once (Manual)", Primary = true,
+    BatSub:AddButton({
+        Name = "Swing Bat Once (Manual)", Primary = true,
         Callback = safeCallback(function()
             local re = GetNetRemote("RE/BatSwing/Trigger")
             if re then re:FireServer() end
@@ -183,25 +184,26 @@ local function Init(HUB)
     })
 
     -- Defense & Guards
-    Tab:Section({ Title = "Defense & Guards" })
+    local GuardSub = HUB.UI.MakeSection("Combat", "Defense & Guards")
+    HUB.UI.GuardSub = GuardSub
 
-    Tab:Toggle({
-        Title = "Anti-Trap (Full Immunity / Destroy Hitboxes)", Default = true, Flag = "avoid_traps",
+    GuardSub:AddToggle({
+        Name = "Anti-Trap (Full Immunity / Destroy Hitboxes)", Default = true, Flag = "avoid_traps",
         Callback = safeCallback(function(v)
             avoidTrapsEnabled = v
             if v then pcall(NeutralizeTraps) end
             Notify("Anti-Trap", v and "Immunity aktif" or "Nonaktif", v and "Success" or "Error")
         end)
     })
-    Tab:Toggle({
-        Title = "No Knockback / Ragdoll Immunity", Default = true, Flag = "no_knockback",
+    GuardSub:AddToggle({
+        Name = "No Knockback / Ragdoll Immunity", Default = true, Flag = "no_knockback",
         Callback = safeCallback(function(v)
             SetNoKnockback(v)
             Notify("Knockback", v and "Immunity aktif" or "Enabled kembali", v and "Success" or "Error")
         end)
     })
-    Tab:Toggle({
-        Title = "Anti-Ragdoll (Quick Standup)", Default = true, Flag = "anti_ragdoll",
+    GuardSub:AddToggle({
+        Name = "Anti-Ragdoll (Quick Standup)", Default = true, Flag = "anti_ragdoll",
         Callback = function(v) antiRagdollEnabled = v end
     })
 

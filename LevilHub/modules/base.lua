@@ -187,29 +187,30 @@ local function Init(HUB)
     HUB.UI.BaseTab = Tab
 
     -- Homestead & Treadmill
-    Tab:Section({ Title = "Homestead & Treadmill" })
+    local UpgradesSub = HUB.UI.MakeSection("Auto", "Homestead & Treadmill")
+    HUB.UI.UpgradesSub = UpgradesSub
 
-    Tab:Toggle({
-        Title = "Auto Upgrade Base / Plot", Default = false, Flag = "up_base_auto",
+    UpgradesSub:AddToggle({
+        Name = "Auto Upgrade Base / Plot", Default = false, Flag = "up_base_auto",
         Callback = function(v) autoUpgradeBase = v end
     })
-    Tab:Toggle({
-        Title = "Auto Upgrade Treadmill Tier", Default = false, Flag = "up_tread_auto",
+    UpgradesSub:AddToggle({
+        Name = "Auto Upgrade Treadmill Tier", Default = false, Flag = "up_tread_auto",
         Callback = function(v) autoUpgradeTreadmill = v end
     })
-    Tab:Toggle({
-        Title = "Auto Buy Speed Trails", Default = false, Flag = "auto_buy_trails",
+    UpgradesSub:AddToggle({
+        Name = "Auto Buy Speed Trails", Default = false, Flag = "auto_buy_trails",
         Callback = function(v) autoBuyTrails = v end
     })
-    Tab:Button({
-        Title = "Upgrade Base Now", Primary = true,
+    UpgradesSub:AddButton({
+        Name = "Upgrade Base Now", Primary = true,
         Callback = safeCallback(function()
             UpgradeHomesteadBase()
             Notify("Base Upgrade", "Requested base upgrade", "Success")
         end)
     })
-    Tab:Button({
-        Title = "Upgrade Treadmill Now",
+    UpgradesSub:AddButton({
+        Name = "Upgrade Treadmill Now",
         Callback = safeCallback(function()
             UpgradeTreadmillTier()
             Notify("Treadmill Upgrade", "Requested treadmill upgrade", "Success")
@@ -217,14 +218,15 @@ local function Init(HUB)
     })
 
     -- Pets & Satchel
-    Tab:Section({ Title = "Pets & Satchel" })
+    local PetsSub = HUB.UI.MakeSection("Auto", "Pets & Satchel")
+    HUB.UI.PetsSub = PetsSub
 
-    Tab:Toggle({
-        Title = "Auto Equip Best Pets", Default = false, Flag = "auto_equip_pets",
+    PetsSub:AddToggle({
+        Name = "Auto Equip Best Pets", Default = false, Flag = "auto_equip_pets",
         Callback = function(v) autoEquipPets = v end
     })
-    Tab:Button({
-        Title = "Equip Best Pets Now", Primary = true,
+    PetsSub:AddButton({
+        Name = "Equip Best Pets Now", Primary = true,
         Callback = safeCallback(function()
             EquipBestPets()
             Notify("Pets", "Equipped best pets", "Success")
@@ -232,33 +234,34 @@ local function Init(HUB)
     })
 
     -- Auto Sell
-    Tab:Section({ Title = "Auto Sell" })
+    local SalesSub = HUB.UI.MakeSection("Auto", "Auto Sell")
+    HUB.UI.SalesSub = SalesSub
 
-    Tab:Toggle({
-        Title = "Auto Sell Low-Tier Pets", Default = false, Flag = "auto_sell_pets",
+    SalesSub:AddToggle({
+        Name = "Auto Sell Low-Tier Pets", Default = false, Flag = "auto_sell_pets",
         Callback = function(v) autoSellPets = v end
     })
-    Tab:Dropdown({
-        Title = "Filter Pet Sell Rarities", Options = RARITY_NAMES, Default = {}, Flag = "sell_pet_rarities",
+    SalesSub:AddMultiDropdown({
+        Name = "Filter Pet Sell Rarities", Options = RARITY_NAMES, Default = {}, Flag = "sell_pet_rarities",
         Callback = function(selectedList) selectedSellPetRarities = selectedList end
     })
-    Tab:Toggle({
-        Title = "Auto Sell Low-Tier Eggs", Default = false, Flag = "auto_sell_eggs",
+    SalesSub:AddToggle({
+        Name = "Auto Sell Low-Tier Eggs", Default = false, Flag = "auto_sell_eggs",
         Callback = function(v) autoSellEggs = v end
     })
-    Tab:Dropdown({
-        Title = "Filter Egg Sell Rarities", Options = RARITY_NAMES, Default = {}, Flag = "sell_egg_rarities",
+    SalesSub:AddMultiDropdown({
+        Name = "Filter Egg Sell Rarities", Options = RARITY_NAMES, Default = {}, Flag = "sell_egg_rarities",
         Callback = function(selectedList) selectedSellEggRarities = selectedList end
     })
-    Tab:Button({
-        Title = "Sell Selected Pets Now", Primary = true,
+    SalesSub:AddButton({
+        Name = "Sell Selected Pets Now", Primary = true,
         Callback = safeCallback(function()
             SellSelectedPets()
             Notify("Sales", "Sold matching pets", "Success")
         end)
     })
-    Tab:Button({
-        Title = "Sell Selected Eggs Now",
+    SalesSub:AddButton({
+        Name = "Sell Selected Eggs Now",
         Callback = safeCallback(function()
             SellSelectedEggs()
             Notify("Sales", "Sold matching eggs", "Success")
@@ -266,14 +269,15 @@ local function Init(HUB)
     })
 
     -- Claim Rewards
-    Tab:Section({ Title = "Claim Rewards" })
+    local RewardsSub = HUB.UI.MakeSection("Auto", "Claim Rewards")
+    HUB.UI.RewardsSub = RewardsSub
 
-    Tab:Toggle({
-        Title = "Auto Claim Away Earnings & Codex", Default = false, Flag = "claim_auto_rewards",
+    RewardsSub:AddToggle({
+        Name = "Auto Claim Away Earnings & Codex", Default = false, Flag = "claim_auto_rewards",
         Callback = function(v) autoClaimRewards = v end
     })
-    Tab:Button({
-        Title = "Claim Away Earnings & Codex Now", Primary = true,
+    RewardsSub:AddButton({
+        Name = "Claim Away Earnings & Codex Now", Primary = true,
         Callback = safeCallback(function()
             ClaimAllAvailableRewards()
             Notify("Rewards", "Claimed all ready rewards and earnings", "Success")
