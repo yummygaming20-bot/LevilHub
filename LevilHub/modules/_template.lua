@@ -1,39 +1,16 @@
--- modules/_template.lua
--- Template modul LevilHub
--- Salin file ini untuk bikin modul baru
-
 local function Init(HUB)
     local Notify = HUB.Notify
-
-    -- ============================================================
-    -- AMBIL TAB DARI MAIN
-    -- Key: "Auto" | "ESP" | "Combat" | "Player" | "Settings"
-    -- ============================================================
+  
     local Tab = HUB.UI.Tabs["Auto"] -- ganti sesuai kebutuhan
-
-    -- ============================================================
-    -- TAMBAH SECTION DI DALAM TAB
-    -- ============================================================
     local Section = HUB.UI.MakeSection("Auto", "Nama Section")
-
-    -- ============================================================
-    -- STATE
-    -- ============================================================
     local enabled = false
 
-    -- ============================================================
-    -- HELPER
-    -- ============================================================
     local function safeC(fn)
         return function(...)
             local ok, err = pcall(fn, ...)
             if not ok then warn("[LevilHub/NAMA_MODUL] " .. tostring(err)) end
         end
     end
-
-    -- ============================================================
-    -- UI CONTROLS
-    -- ============================================================
     Section:AddToggle({
         Name     = "Contoh Toggle",
         Default  = false,
@@ -50,7 +27,7 @@ local function Init(HUB)
         Suffix   = "x",
         Flag     = "nama_slider_flag",
         Callback = function(v)
-            -- gunakan nilai v
+    
         end,
     })
 
@@ -62,9 +39,6 @@ local function Init(HUB)
         end),
     })
 
-    -- ============================================================
-    -- RETURN
-    -- ============================================================
     return {
         Unload = function()
             enabled = false
